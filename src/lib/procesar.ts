@@ -66,13 +66,33 @@ function lienzo(w: number, h: number) {
 
 export class ErrorFoto extends Error {}
 
+export interface Medidas {
+  /** Fracción del lado menor de la foto que ocupa el fruto */
+  tamRelativo: number
+  /** Tamaño del fruto en píxeles de la foto original */
+  tamPx: number
+  /** Gris mediano de la foto (exposición del fondo) */
+  fondo: number
+  /** Área del segundo objeto oscuro respecto del fruto */
+  segundo: number
+  /** Indicadores medidos durante la segmentación (ver nucleo.js, paso E) */
+  bordeNitidez: number
+  color: [number, number, number]
+  brilloFruto: number
+  solidez: number
+  aspecto: number
+  fondoDE: number
+  nitidez: number
+  anisotropia: number
+}
+
 export interface FotoProcesada {
   /** Imagen 320×320 exactamente como la recibe el modelo */
   entrada: ImageData
   /** Miniatura de la foto original (dataURL) */
   original: string
-  /** Fracción del lado menor de la foto que ocupa el fruto */
-  tamRelativo: number
+  /** Medidas para el control de calidad de la foto */
+  medidas: Medidas
 }
 
 export async function procesarFoto(fuente: Blob): Promise<FotoProcesada> {
@@ -112,7 +132,8 @@ export async function procesarFoto(fuente: Blob): Promise<FotoProcesada> {
   const p = await pedir<Preparada | null>({ tipo: 'preparar', img: rec, salida: ENTRADA }, [rec.data.buffer])
   if (!p) throw new ErrorFoto('No se pudo separar el fruto del fondo. Revisa la luz y evita sombras fuertes.')
 
-  return { entrada: new ImageData(new Uint8ClampedArray(p.data), ENTRADA, ENTRADA), original, tamRelativo }
+  const medidas: Medidas = { tamRelativo, tamPx: tam, fondo: loc.fondo, segundo: loc.segundo, ...p.calidad }
+  return { entrada: new ImageData(new Uint8ClampedArray(p.data), ENTRADA, ENTRADA), original, medidas }
 }
 
 /** Miniatura JPEG pequeña de una imagen ya preprocesada (para guardar en el dispositivo). */

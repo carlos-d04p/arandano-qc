@@ -2,6 +2,7 @@
 // y la app acumula las métricas del modelo con esas fotos (positivo = deshidratado).
 import { useCallback, useEffect, useState } from 'react'
 import { UMBRAL_ALTO, UMBRAL_BAJO, veredicto } from './veredicto'
+import type { CodigoAviso } from './calidad'
 
 export type ClaseReal = 'sano' | 'deshidratado'
 
@@ -13,6 +14,8 @@ export interface Registro {
   p: number
   fecha: string
   miniatura: string
+  /** Advertencias de calidad de la foto (vacío = foto adecuada) */
+  avisos?: CodigoAviso[]
 }
 
 interface Estado {
@@ -140,10 +143,10 @@ export function aCSV(regs: Registro[], condiciones: string): string {
     const pred = r.p >= 0.5 ? 'deshidratado' : 'sano'
     return [
       i + 1, idFruto(r.fruto), `V${r.vista}`, r.real, r.p.toFixed(4), pred, veredicto(r.p)!.corto,
-      pred === r.real ? 1 : 0, new Date(r.fecha).toLocaleString('es'), cond,
+      pred === r.real ? 1 : 0, r.avisos?.length ? r.avisos.join('|') : 'ok', new Date(r.fecha).toLocaleString('es'), cond,
     ].join(';')
   })
-  return ['muestra;fruto;vista;clase_real;p_deshidratado;prediccion_05;veredicto;acierto;fecha;condiciones', ...filas].join('\n')
+  return ['muestra;fruto;vista;clase_real;p_deshidratado;prediccion_05;veredicto;acierto;calidad;fecha;condiciones', ...filas].join('\n')
 }
 
 export function resumenTexto(regs: Registro[], rechazadas: number, condiciones: string): string {
@@ -151,11 +154,13 @@ export function resumenTexto(regs: Registro[], rechazadas: number, condiciones: 
     `${t} (n = ${m.n}): exactitud ${fmt(m.exactitud)} [IC95 ${m.ic ? `${fmt(m.ic[0])} – ${fmt(m.ic[1])}` : '—'}], ` +
     `precisión ${fmt(m.precision)}, sensibilidad ${fmt(m.sensibilidad)}, especificidad ${fmt(m.especificidad)}, F1 ${fmt(m.f1)}. ` +
     `Matriz [[VN ${m.tn}, FP ${m.fp}], [FN ${m.fn}, VP ${m.tp}]]. Dudosos (${Math.round(UMBRAL_BAJO * 100)}–${Math.round(UMBRAL_ALTO * 100)} %): ${m.dudosos}.`
+  const buenas = regs.filter((r) => !r.avisos?.length)
   return [
     `Validación de Arándano QC · ${new Date().toLocaleString('es')}`,
     condiciones ? `Condiciones: ${condiciones}` : '',
     linea('Por foto', calcular(regs)),
     linea('Por fruto', calcular(porFruto(regs))),
-    `Fotos rechazadas por el preprocesamiento: ${rechazadas}.`,
+    buenas.length < regs.length ? linea('Por foto, solo fotos sin advertencias de calidad', calcular(buenas)) : '',
+    `Fotos con advertencias de calidad: ${regs.length - buenas.length}. Fotos rechazadas antes de clasificar: ${rechazadas}.`,
   ].filter(Boolean).join('\n')
 }

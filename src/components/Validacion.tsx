@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { aDataURL, ErrorFoto, miniaturaDe, procesarFoto } from '../lib/procesar'
 import { clasificar } from '../lib/modelo'
+import { evaluarCalidad, FotoNoValida, type CodigoAviso } from '../lib/calidad'
 import { descargar } from '../lib/lote'
 import { pct, UMBRAL_ALTO, UMBRAL_BAJO } from '../lib/veredicto'
 import {
@@ -12,6 +13,10 @@ import type { EstadoModelo } from '../App'
 
 const MAX_VISTAS = 3
 const NOMBRE: Record<ClaseReal, string> = { sano: 'Sano', deshidratado: 'Deshidratado' }
+const ETIQUETA_AVISO: Record<CodigoAviso, string> = {
+  desenfoque: 'desenfocada o movida', pequeno: 'fruto pequeño', oscura: 'oscura', sobreexpuesta: 'sobreexpuesta',
+  fondo: 'fondo con manchas', color: 'color poco habitual', objeto_cercano: 'objeto cercano',
+}
 
 interface Props {
   estadoModelo: EstadoModelo
@@ -86,10 +91,13 @@ export function Validacion({ estadoModelo, avisar }: Props) {
   const [procesando, setProcesando] = useState(false)
   const [error, setError] = useState('')
   const [nivel, setNivel] = useState<'foto' | 'fruto'>('foto')
+  const [soloBuenas, setSoloBuenas] = useState(false)
   const camara = useRef<HTMLInputElement>(null)
   const galeria = useRef<HTMLInputElement>(null)
 
-  const casos: Caso[] = nivel === 'foto' ? val.registros : porFruto(val.registros)
+  const usados = soloBuenas ? val.registros.filter((r) => !r.avisos?.length) : val.registros
+  const casos: Caso[] = nivel === 'foto' ? usados : porFruto(usados)
+  const nAvisos = val.registros.filter((r) => r.avisos?.length).length
   const m = calcular(casos)
   const nFrutos = new Set(val.registros.map((r) => r.fruto)).size
   const vistasDelFruto = frutoVista == null ? 0 : val.registros.filter((r) => r.fruto === frutoVista).length
@@ -107,13 +115,14 @@ export function Validacion({ estadoModelo, avisar }: Props) {
       for (const f of fuentes) {
         try {
           const r = await procesarFoto(f)
+          const avisos = evaluarCalidad(r.medidas)
           const p = await clasificar(r.entrada)
-          const reg = val.agregar({ fruto, vista, real, p, fecha: new Date().toISOString(), miniatura: miniaturaDe(r.entrada) })
+          const reg = val.agregar({ fruto, vista, real, p, fecha: new Date().toISOString(), miniatura: miniaturaDe(r.entrada), avisos: avisos.map((a) => a.codigo) })
           nuevos.push({ ...reg, entrada: aDataURL(r.entrada) })
           if (frutoVista == null) fruto++
           else vista++
         } catch (e) {
-          if (e instanceof ErrorFoto) {
+          if (e instanceof ErrorFoto || e instanceof FotoNoValida) {
             val.sumarRechazo()
             setError(`Foto rechazada por el preprocesamiento: ${e.message}`)
           } else setError('No se pudo analizar la imagen: ' + (e instanceof Error ? e.message : String(e)))
@@ -238,8 +247,13 @@ export function Validacion({ estadoModelo, avisar }: Props) {
                       <dt>Predicción</dt><dd>{ultimo.p >= 0.5 ? 'Deshidratado' : 'Sano'} <span className="mono muted">({pct(ultimo.p)})</span></dd>
                       <dt>Resultado</dt>
                       <dd>{(ultimo.p >= 0.5 ? 'deshidratado' : 'sano') === ultimo.real ? <span className="calidad ok">Acierto</span> : <span className="calidad mal">Error</span>}</dd>
+                      <dt>Calidad</dt>
+                      <dd>{ultimo.avisos?.length ? <span className="calidad duda">Con advertencias</span> : <span className="calidad ok">Adecuada</span>}</dd>
                     </dl>
                   </div>
+                  {ultimo.avisos && ultimo.avisos.length > 0 && (
+                    <p className="small muted" style={{ marginTop: 10 }}>Advertencias: {ultimo.avisos.map((a) => ETIQUETA_AVISO[a]).join(', ')}. El registro se conserva y queda marcado en el CSV; puedes excluir estas fotos de las métricas.</p>
+                  )}
                   {ultimos.length > 1 && (
                     <p className="small" style={{ marginTop: 10 }}>Se registraron <b className="mono">{ultimos.length}</b> fotos: <b className="mono">{aciertosUltimos}</b> aciertos. Arriba se muestra la última.</p>
                   )}
@@ -288,8 +302,14 @@ export function Validacion({ estadoModelo, avisar }: Props) {
                     <span className="mono">{val.registros.length}</span> fotos de <span className="mono">{nFrutos}</span> frutos ·
                     {' '}<span className="mono">{val.registros.filter((r) => r.real === 'sano').length}</span> sanas,
                     {' '}<span className="mono">{val.registros.filter((r) => r.real === 'deshidratado').length}</span> deshidratadas ·
-                    {' '}<span className="mono">{val.rechazadas}</span> rechazadas
+                    {' '}<span className="mono">{nAvisos}</span> con advertencias · <span className="mono">{val.rechazadas}</span> rechazadas
                   </p>
+                  {nAvisos > 0 && (
+                    <label className="check" style={{ marginBottom: 12 }}>
+                      <input type="checkbox" checked={soloBuenas} onChange={(e) => setSoloBuenas(e.target.checked)} />
+                      Calcular solo con fotos sin advertencias de calidad
+                    </label>
+                  )}
                   <TablaMetricas m={m} />
                   <h3 className="sub">Distribución de P(deshidratado)</h3>
                   <Distribucion casos={casos} />
@@ -323,7 +343,10 @@ export function Validacion({ estadoModelo, avisar }: Props) {
                           <td className="mono">{idFruto(r.fruto)}<span className="muted">·V{r.vista}</span></td>
                           <td>{NOMBRE[r.real]}</td>
                           <td className="r mono">{pct(r.p)}</td>
-                          <td>{ok ? <span className="calidad ok">Acierto</span> : <span className="calidad mal">Error</span>}</td>
+                          <td>
+                            {ok ? <span className="calidad ok">Acierto</span> : <span className="calidad mal">Error</span>}
+                            {r.avisos && r.avisos.length > 0 && <span className="aviso-mini" title={r.avisos.map((a) => ETIQUETA_AVISO[a]).join(', ')}>calidad</span>}
+                          </td>
                           <td><button className="icon-btn" onClick={() => val.quitar(r.id)} aria-label={`Eliminar registro de ${idFruto(r.fruto)}`}><Basura size={16} /></button></td>
                         </tr>
                       )

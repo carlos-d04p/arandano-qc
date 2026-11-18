@@ -11,6 +11,7 @@ export interface Localizacion {
   ancho: number
   alto: number
   fondo: number
+  segundo: number
 }
 
 export interface Preparada {
@@ -19,6 +20,16 @@ export interface Preparada {
   height: number
   fondo: number
   areaFruto: number
+  calidad: {
+    bordeNitidez: number
+    color: [number, number, number]
+    brilloFruto: number
+    solidez: number
+    aspecto: number
+    fondoDE: number
+    nitidez: number
+    anisotropia: number
+  }
 }
 
 declare const Nucleo: {

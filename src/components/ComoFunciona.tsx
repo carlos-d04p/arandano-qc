@@ -15,6 +15,7 @@ const SECCIONES = [
   ['resumen', 'Resumen'],
   ['proceso', 'Proceso de análisis'],
   ['decision', 'Regla de decisión'],
+  ['calidad', 'Control de calidad de la foto'],
   ['fotos', 'Toma de fotos'],
   ['modelo', 'Modelo y resultados'],
   ['validacion-campo', 'Validación con celular'],
@@ -142,6 +143,43 @@ export function ComoFunciona({ estadoModelo }: { estadoModelo: EstadoModelo }) {
               </tbody>
             </table>
           </div>
+        </section>
+
+        <section id="calidad">
+          <h2>Control de calidad de la foto</h2>
+          <p>
+            Antes de confiar en la predicción, la aplicación revisa que la foto se parezca a las del entrenamiento. Los umbrales se
+            calibraron con 180 fotos válidas del conjunto de datos, las fotos que se excluyeron por movimiento y degradaciones simuladas.
+          </p>
+          <h3>La foto no se analiza si…</h3>
+          <div className="tabla-wrap">
+            <table className="tabla">
+              <thead><tr><th>Problema</th><th>Criterio</th></tr></thead>
+              <tbody>
+                <tr><td>Hay más de un fruto u objeto oscuro</td><td>Segundo objeto con un área ≥ 40 % de la del fruto</td></tr>
+                <tr><td>La forma es demasiado alargada</td><td>Relación ancho/alto &lt; 0,5 (en el dataset, mínimo 0,58)</td></tr>
+                <tr><td>La forma es irregular</td><td>Área / envolvente convexa &lt; 0,55 (en el dataset, mínimo 0,68)</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <h3>La foto se analiza, pero el resultado se marca como poco confiable si…</h3>
+          <div className="tabla-wrap">
+            <table className="tabla">
+              <thead><tr><th>Advertencia</th><th>Criterio</th></tr></thead>
+              <tbody>
+                <tr><td>Desenfocada o movida</td><td>Definición del contorno del fruto &lt; 0,036 (pendiente del borde dividida por el contraste; no depende de si la piel es lisa o arrugada)</td></tr>
+                <tr><td>Fruto muy pequeño</td><td>Menos del 15 % del lado menor de la foto o menos de 220 px</td></tr>
+                <tr><td>Foto oscura o sobreexpuesta</td><td>Gris mediano de la foto fuera del rango 70–225</td></tr>
+                <tr><td>Fondo con manchas o textura</td><td>Desviación estándar del gris del fondo &gt; 28</td></tr>
+                <tr><td>Color poco habitual</td><td>Saturación del color del fruto &gt; 0,70</td></tr>
+                <tr><td>Objeto oscuro cercano</td><td>Segundo objeto entre el 25 % y el 40 % del área del fruto</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p style={{ marginTop: 10 }}>
+            Estos controles detectan problemas evidentes, no garantizan que una foto sea perfecta: un desenfoque leve puede pasar inadvertido.
+            En la sección Validación, las fotos con advertencias quedan marcadas y pueden excluirse de las métricas.
+          </p>
         </section>
 
         <section id="fotos">

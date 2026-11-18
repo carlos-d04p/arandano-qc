@@ -2,7 +2,7 @@
 
 Aplicación web (PWA) que detecta **arándanos deshidratados** (con arrugamiento visible) a partir de una foto, usando un clasificador **YOLOv11n-cls** que corre directamente en el navegador del celular. Las fotos no se envían a ningún servidor.
 
-- **Evaluar**: basta una foto del fruto desde cualquier ángulo. La app la preprocesa igual que el dataset y la clasifica. Si el resultado es dudoso, sugiere agregar otra vista (hasta 3) y promedia las probabilidades.
+- **Evaluar**: basta una foto del fruto desde cualquier ángulo. La app revisa la calidad de la foto (varios objetos, forma, desenfoque, tamaño, exposición, fondo), la preprocesa igual que el dataset y la clasifica. Si el resultado es dudoso, sugiere agregar otra vista (hasta 3) y promedia las probabilidades.
 - **Lote**: guarda los frutos evaluados en el dispositivo, calcula el % defectuoso y exporta a CSV.
 - **Validación**: mide el desempeño del modelo con fotos de celular. Se marca la clase real de cada fruto antes de fotografiarlo y la app calcula exactitud (con IC 95 % de Wilson), sensibilidad, especificidad, precisión, F1 y matriz de confusión, por foto y por fruto. Exporta a CSV.
 - **Cómo funciona**: explica el proceso paso a paso, la regla de decisión, cómo tomar la foto, el modelo, sus resultados y sus limitaciones, con una demostración en vivo.
@@ -71,6 +71,7 @@ src/
   lib/veredicto.ts        umbrales y veredicto
   lib/lote.ts             lote guardado en el dispositivo y exportación CSV
   lib/validacion.ts       registros de validación, métricas y exportación
+  lib/calidad.ts          control de calidad de la foto (umbrales calibrados con el dataset)
 ```
 
 ## Limitaciones

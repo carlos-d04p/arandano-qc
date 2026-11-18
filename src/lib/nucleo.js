@@ -62,7 +62,7 @@ const Nucleo = (() => {
   }
   function mayorComponente(m, w, h) {
     const lab = new Int32Array(m.length), cola = new Int32Array(m.length);
-    let mejor = null, id = 0;
+    let mejor = null, segundo = 0, id = 0;
     for (let s = 0; s < m.length; s++) {
       if (!m[s] || lab[s]) continue;
       id++; let ini = 0, fin = 0; cola[fin++] = s; lab[s] = id;
@@ -73,10 +73,11 @@ const Nucleo = (() => {
         const vec = [x > 0 ? p - 1 : -1, x < w - 1 ? p + 1 : -1, y > 0 ? p - w : -1, y < h - 1 ? p + w : -1];
         for (const q of vec) if (q >= 0 && m[q] && !lab[q]) { lab[q] = id; cola[fin++] = q; }
       }
-      if (!mejor || n > mejor.n) mejor = { id, n, cx: sx / n, cy: sy / n, x0, y0, x1, y1 };
+      if (!mejor || n > mejor.n) { if (mejor) segundo = Math.max(segundo, mejor.n); mejor = { id, n, cx: sx / n, cy: sy / n, x0, y0, x1, y1 }; }
+      else segundo = Math.max(segundo, n);
     }
     if (!mejor) return null;
-    mejor.lab = lab; return mejor;
+    mejor.lab = lab; mejor.segundo = segundo; return mejor;
   }
   function envolvente(pts) {                      // casco convexo (monotone chain)
     pts.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
@@ -112,7 +113,8 @@ const Nucleo = (() => {
     m = morf(morf(m, w, h, 1, true), w, h, 1, false);
     const c = mayorComponente(m, w, h);
     if (!c || c.n < 30) return null;
-    return { cx: c.cx / w, cy: c.cy / h, ancho: (c.x1 - c.x0 + 1) / w, alto: (c.y1 - c.y0 + 1) / h, fondo };
+    // segundo: área del segundo objeto oscuro respecto del fruto (para detectar varios frutos u objetos)
+    return { cx: c.cx / w, cy: c.cy / h, ancho: (c.x1 - c.x0 + 1) / w, alto: (c.y1 - c.y0 + 1) / h, fondo, segundo: c.segundo / c.n };
   }
 
   // Pasos B-D: sobre el recorte 1000x1000 (como armar_dataset.py + segmentar.py)
@@ -141,6 +143,8 @@ const Nucleo = (() => {
       if (a >= 0) { pts.push([a, y], [b + 1, y], [a, y + 1], [b + 1, y + 1]); }
     }
     let mh = rellenarPoligono(envolvente(pts), w, h);
+    let areaCasco = 0;
+    for (let i = 0; i < n; i++) areaCasco += mh[i];
     mh = morf(mh, w, h, Math.max(1, Math.round(2 * w / LADO)), false);
     let x0 = w, y0 = h, x1 = 0, y1 = 0;
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (mh[y * w + x]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
@@ -164,7 +168,73 @@ const Nucleo = (() => {
       const o = 4 * (j * salida + i);
       out[o] = acc[0] / peso; out[o + 1] = acc[1] / peso; out[o + 2] = acc[2] / peso; out[o + 3] = 255;
     }
-    return { data: out, width: salida, height: salida, fondo: bg, areaFruto: c.n / n };
+    return { data: out, width: salida, height: salida, fondo: bg, areaFruto: c.n / n,
+      calidad: indicadores(c, nd, g, w, h, bg, areaCasco, out, salida, alfa, ox, oy, s) };
+  }
+
+  // E. Indicadores de calidad de la foto. Solo miden: no modifican la imagen que recibe el modelo.
+  function indicadores(c, nd, g, w, h, bg, areaCasco, out, S, alfa, ox, oy, s) {
+    // color medio del fruto (ya normalizado, fondo = 140)
+    let r = 0, gg = 0, b = 0;
+    for (let q = 0; q < w * h; q++) if (c.lab[q] === c.id) { r += nd[3 * q]; gg += nd[3 * q + 1]; b += nd[3 * q + 2]; }
+    // uniformidad del fondo: desviación estándar del gris en el borde
+    const bi = bordes(w, h, Math.round(80 * w / LADO));
+    let sm = 0, sm2 = 0;
+    for (const i of bi) { sm += g[i]; sm2 += g[i] * g[i]; }
+    const media = sm / bi.length;
+    // nitidez sobre la imagen final 320×320, solo en el interior del fruto (sin el contorno)
+    const go = new Float32Array(S * S);
+    let m = new Uint8Array(S * S);
+    for (let j = 0; j < S; j++) for (let i = 0; i < S; i++) {
+      const k = j * S + i, o = 4 * k;
+      go[k] = 0.299 * out[o] + 0.587 * out[o + 1] + 0.114 * out[o + 2];
+      const x = Math.floor(ox + (i + 0.5) * s), y = Math.floor(oy + (j + 0.5) * s);
+      m[k] = x >= 0 && y >= 0 && x < w && y < h && alfa[y * w + x] > 0.999 ? 1 : 0;
+    }
+    m = morf(m, S, S, Math.round(S / 40), true);
+    let nL = 0, sL = 0, sL2 = 0, ex = 0, ey = 0;
+    for (let y = 1; y < S - 1; y++) for (let x = 1; x < S - 1; x++) {
+      const k = y * S + x;
+      if (!m[k]) continue;
+      const L = 4 * go[k] - go[k - 1] - go[k + 1] - go[k - S] - go[k + S];
+      const gx = go[k - S + 1] + 2 * go[k + 1] + go[k + S + 1] - go[k - S - 1] - 2 * go[k - 1] - go[k + S - 1];
+      const gy = go[k + S - 1] + 2 * go[k + S] + go[k + S + 1] - go[k - S - 1] - 2 * go[k - S] - go[k - S + 1];
+      nL++; sL += L; sL2 += L * L; ex += gx * gx; ey += gy * gy;
+    }
+    // definición del contorno: pendiente máxima del gris en el borde fruto/fondo dividida por el contraste.
+    // No depende de la textura de la piel (lisa o arrugada); baja cuando la foto está desenfocada o movida.
+    const lum = (q) => 0.299 * nd[3 * q] + 0.587 * nd[3 * q + 1] + 0.114 * nd[3 * q + 2];
+    const contraste = Math.max(1, bg - (0.299 * r + 0.587 * gg + 0.114 * b) / c.n);
+    const pend = []
+    const R = Math.max(2, Math.round(3 * w / LADO));
+    for (let y = c.y0 + 1; y < c.y1; y += 2) for (let x = c.x0 + 1; x < c.x1; x++) {
+      const q = y * w + x;
+      if (c.lab[q] !== c.id) continue;
+      if (c.lab[q - 1] === c.id && c.lab[q + 1] === c.id && c.lab[q - w] === c.id && c.lab[q + w] === c.id) continue;
+      let mx = 0;
+      for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
+        const xx = x + dx, yy = y + dy;
+        if (xx < 1 || yy < 1 || xx >= w - 1 || yy >= h - 1) continue;
+        const k = yy * w + xx;
+        const gx = lum(k + 1) - lum(k - 1), gy = lum(k + w) - lum(k - w);
+        const v = Math.hypot(gx, gy) / 2;
+        if (v > mx) mx = v;
+      }
+      pend.push(mx / contraste);
+    }
+    pend.sort((a, z) => a - z);
+    const bordeNitidez = pend.length ? pend[Math.floor(pend.length * 0.5)] * (LADO / w) : 0;
+    const bw = c.x1 - c.x0 + 1, bh = c.y1 - c.y0 + 1;
+    return {
+      bordeNitidez,
+      color: [r / c.n, gg / c.n, b / c.n],
+      brilloFruto: (0.299 * r + 0.587 * gg + 0.114 * b) / c.n / bg,
+      solidez: c.n / Math.max(1, areaCasco),
+      aspecto: Math.min(bw, bh) / Math.max(bw, bh),
+      fondoDE: Math.sqrt(Math.max(0, sm2 / bi.length - media * media)),
+      nitidez: nL ? sL2 / nL - (sL / nL) ** 2 : 0,
+      anisotropia: Math.max(ex, ey) ? Math.min(ex, ey) / Math.max(ex, ey) : 1,
+    };
   }
   return { localizar, preparar, LADO };
 })();

@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { aDataURL, ErrorFoto, procesarFoto } from '../lib/procesar'
 import { clasificar } from '../lib/modelo'
+import { evaluarCalidad, FotoNoValida, type Aviso } from '../lib/calidad'
 import { pct, promedio, UMBRAL_ALTO, UMBRAL_BAJO, veredicto } from '../lib/veredicto'
 import { Escala } from './Escala'
 import { Alerta, Camara, Galeria, Mas } from './Iconos'
@@ -12,6 +13,7 @@ interface Vista {
   entrada: string
   original: string
   p: number
+  avisos: Aviso[]
 }
 
 interface Props {
@@ -50,6 +52,7 @@ export function Analizar({ numero, estadoModelo, reintentarModelo, onGuardar, av
   const v = veredicto(pm)
   const actual = vistas[Math.min(sel, vistas.length - 1)]
   const lleno = vistas.length >= MAX_VISTAS
+  const conAvisos = vistas.filter((x) => x.avisos.length).length
 
   async function analizar(fuentes: Blob[]) {
     setError('')
@@ -60,11 +63,12 @@ export function Analizar({ numero, estadoModelo, reintentarModelo, onGuardar, av
       for (const f of fuentes.slice(0, libres)) {
         try {
           const r = await procesarFoto(f)
+          const avisos = evaluarCalidad(r.medidas)
           const p = await clasificar(r.entrada)
-          setVistas((vs) => [...vs, { entrada: aDataURL(r.entrada), original: r.original, p }])
+          setVistas((vs) => [...vs, { entrada: aDataURL(r.entrada), original: r.original, p, avisos }])
           setSel(MAX_VISTAS) // se ajusta a la última vista disponible
         } catch (e) {
-          if (e instanceof ErrorFoto) setError(e.message)
+          if (e instanceof ErrorFoto || e instanceof FotoNoValida) setError(`No se analizó la foto. ${e.message}`)
           else setError('No se pudo analizar la imagen: ' + (e instanceof Error ? e.message : String(e)))
         }
       }
@@ -86,6 +90,14 @@ export function Analizar({ numero, estadoModelo, reintentarModelo, onGuardar, av
     } catch {
       setError('No se pudo cargar la imagen de ejemplo.')
     }
+  }
+
+  function repetir() {
+    const i = Math.min(sel, vistas.length - 1)
+    setVistas((vs) => vs.filter((_, k) => k !== i))
+    setSel(MAX_VISTAS)
+    setError('')
+    camara.current?.click()
   }
 
   function reiniciar() {
@@ -149,6 +161,7 @@ export function Analizar({ numero, estadoModelo, reintentarModelo, onGuardar, av
                   {vistas.map((vi, i) => (
                     <button key={i} className="miniatura" aria-pressed={i === sel} onClick={() => setSel(i)} aria-label={`Vista ${i + 1}`}>
                       <img src={vi.entrada} alt="" />
+                      {vi.avisos.length > 0 && <span className="marca-aviso" title="Foto con advertencias de calidad">!</span>}
                       <span className="p">{pct(vi.p)}</span>
                     </button>
                   ))}
@@ -207,9 +220,22 @@ export function Analizar({ numero, estadoModelo, reintentarModelo, onGuardar, av
                 <dd className="mono">{pm != null ? pct(pm) : '—'}</dd>
                 <dt>Vistas analizadas</dt>
                 <dd className="mono">{vistas.length || '—'}</dd>
+                <dt>Calidad de la foto</dt>
+                <dd>{!vistas.length ? '—' : conAvisos ? <span className="calidad duda">{conAvisos === vistas.length ? 'Con advertencias' : `${conAvisos} de ${vistas.length} con advertencias`}</span> : <span className="calidad ok">Adecuada</span>}</dd>
                 <dt>Criterio</dt>
                 <dd className="small">&lt; {Math.round(UMBRAL_BAJO * 100)} % cumple · ≥ {Math.round(UMBRAL_ALTO * 100)} % no cumple</dd>
               </dl>
+
+              {actual && actual.avisos.length > 0 && (
+                <div className="nota aviso" style={{ marginTop: 14 }}>
+                  <Alerta size={16} />
+                  <div>
+                    <b>Resultado poco confiable{vistas.length > 1 ? ` en la vista ${Math.min(sel, vistas.length - 1) + 1}` : ''}.</b> La foto no cumple las condiciones con que se entrenó el modelo:
+                    <ul className="lista-avisos">{actual.avisos.map((a) => <li key={a.codigo}>{a.texto}</li>)}</ul>
+                    <div className="nota-acc"><button className="btn sec peq" onClick={repetir} disabled={bloqueado}><Camara size={16} /> Repetir foto</button></div>
+                  </div>
+                </div>
+              )}
 
               {v?.clase === 'duda' && !lleno && (
                 <div className="nota aviso" style={{ marginTop: 14 }}>

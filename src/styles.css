@@ -470,3 +470,13 @@ details.faq p { font-size: 0.9rem; padding-bottom: 14px; }
 
 .registros-scroll { max-height: 420px; overflow-y: auto; }
 .registros-scroll thead th { position: sticky; top: 0; }
+
+/* ---------- Calidad de la foto ---------- */
+.lista-avisos { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 3px; }
+.miniatura .marca-aviso {
+  position: absolute; top: 3px; right: 3px; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--warn); color: #fff; font-size: 0.7rem; font-weight: 700; display: grid; place-items: center; line-height: 1;
+}
+.check { display: flex; align-items: center; gap: 8px; font-size: 0.86rem; color: var(--text-2); cursor: pointer; }
+.check input { width: 16px; height: 16px; accent-color: var(--accent); margin: 0; }
+.aviso-mini { margin-left: 8px; font-size: 0.7rem; color: var(--warn); border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); border-radius: 4px; padding: 0 4px; }
