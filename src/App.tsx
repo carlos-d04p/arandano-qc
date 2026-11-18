@@ -10,7 +10,7 @@ export type EstadoModelo = 'cargando' | 'listo' | 'error'
 type Pestana = 'analizar' | 'lote' | 'guia'
 
 const PESTANAS: { id: Pestana; titulo: string; Icono: typeof Escanear }[] = [
-  { id: 'analizar', titulo: 'Analizar', Icono: Escanear },
+  { id: 'analizar', titulo: 'Evaluar', Icono: Escanear },
   { id: 'lote', titulo: 'Lote', Icono: Lista },
   { id: 'guia', titulo: 'Cómo funciona', Icono: Info },
 ]
@@ -45,7 +45,10 @@ export default function App() {
   useEffect(esperarModelo, [esperarModelo])
 
   useEffect(() => {
-    const f = () => setPestana(pestanaInicial())
+    const f = () => {
+      const p = location.hash.slice(1)
+      if (p === 'lote' || p === 'guia' || p === '') setPestana(pestanaInicial())
+    }
     window.addEventListener('hashchange', f)
     return () => window.removeEventListener('hashchange', f)
   }, [])
@@ -64,19 +67,7 @@ export default function App() {
     timer.current = window.setTimeout(() => setToast(''), 2400)
   }, [])
 
-  const etiquetaModelo = { cargando: 'Cargando modelo', listo: 'Modelo listo', error: 'Modelo sin cargar' }[estadoModelo]
-
-  const botones = (clase: string) => (
-    <nav className={clase} aria-label="Secciones">
-      {PESTANAS.map(({ id, titulo, Icono }) => (
-        <button key={id} onClick={() => ir(id)} aria-current={pestana === id ? 'page' : undefined}>
-          <Icono size={clase === 'nav-bottom' ? 22 : 17} />
-          {titulo}
-          {id === 'lote' && lote.length > 0 && <span className="insignia num">{lote.length}</span>}
-        </button>
-      ))}
-    </nav>
-  )
+  const etiquetaModelo = { cargando: 'Cargando modelo', listo: 'Modelo listo', error: 'Error de modelo · reintentar' }[estadoModelo]
 
   return (
     <div className="app">
@@ -84,17 +75,24 @@ export default function App() {
         <div className="topbar-in">
           <div className="marca">
             <Logo />
-            <div style={{ minWidth: 0 }}>
-              <h1>Arándano QC</h1>
-              <p>Control de calidad por visión artificial</p>
-            </div>
+            <span className="marca-nombre">Arándano QC</span>
+            <span className="marca-sep" />
+            <span className="marca-sub">Control de calidad</span>
           </div>
+          <nav className="tabs-top" aria-label="Secciones">
+            {PESTANAS.map(({ id, titulo }) => (
+              <button key={id} onClick={() => ir(id)} aria-current={pestana === id ? 'page' : undefined}>
+                {titulo}
+                {id === 'lote' && lote.length > 0 && <span className="contador">{lote.length}</span>}
+              </button>
+            ))}
+          </nav>
           <div className="espacio" />
-          {botones('tabs-top')}
           <button
-            className={`estado ${estadoModelo}`}
+            className={`estado-modelo ${estadoModelo}`}
             onClick={estadoModelo === 'error' ? iniciarModelo : undefined}
-            title={estadoModelo === 'error' ? 'Reintentar' : 'YOLOv11n-cls · ONNX'}
+            disabled={estadoModelo !== 'error'}
+            title="YOLOv11n-cls · ONNX Runtime Web"
           >
             <span className="punto" />
             {etiquetaModelo}
@@ -103,7 +101,7 @@ export default function App() {
       </header>
 
       <main className="contenido">
-        {/* Analizar queda montado para no perder las vistas al cambiar de pestaña */}
+        {/* Evaluar queda montado para no perder las vistas al cambiar de sección */}
         <div hidden={pestana !== 'analizar'}>
           <Analizar
             numero={siguiente}
@@ -118,7 +116,17 @@ export default function App() {
         {pestana === 'guia' && <ComoFunciona estadoModelo={estadoModelo} />}
       </main>
 
-      {botones('nav-bottom')}
+      <nav className="nav-bottom" aria-label="Secciones">
+        {PESTANAS.map(({ id, titulo, Icono }) => (
+          <button key={id} onClick={() => ir(id)} aria-current={pestana === id ? 'page' : undefined}>
+            <span className="icono-wrap">
+              <Icono size={21} />
+              {id === 'lote' && lote.length > 0 && <span className="contador-badge">{lote.length}</span>}
+            </span>
+            {titulo}
+          </button>
+        ))}
+      </nav>
       {toast && <div className="toast" role="status">{toast}</div>}
     </div>
   )

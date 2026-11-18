@@ -55,19 +55,12 @@ export const Objetivo = (p: P) => (
   <Base {...p}><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1" /></Base>
 )
 
-export function Logo({ size = 36 }: { size?: number }) {
+export function Logo({ size = 26 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" className="marca-logo" aria-hidden="true">
-      <rect width="64" height="64" rx="16" fill="#463b6c" />
-      <circle cx="32" cy="35" r="17" fill="#8d7fbf" />
-      <circle cx="32" cy="35" r="17" fill="url(#brillo)" />
-      <path d="M26.5 22.5 29 25.5l3-4 3 4 2.5-3-1 5.5h-9z" fill="#2c2545" />
-      <defs>
-        <radialGradient id="brillo" cx="0.35" cy="0.35" r="0.75">
-          <stop offset="0" stopColor="#ffffff" stopOpacity="0.35" />
-          <stop offset="1" stopColor="#ffffff" stopOpacity="0" />
-        </radialGradient>
-      </defs>
+      <rect width="64" height="64" rx="14" style={{ fill: 'var(--accent)' }} />
+      <circle cx="32" cy="35" r="15" fill="none" stroke="#fff" strokeWidth="5" style={{ stroke: 'var(--on-accent)' }} />
+      <path d="M25 18.5l3.5 4.5 3.5-5.5 3.5 5.5 3.5-4.5" fill="none" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" style={{ stroke: 'var(--on-accent)' }} />
     </svg>
   )
 }

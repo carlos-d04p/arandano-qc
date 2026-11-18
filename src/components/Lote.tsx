@@ -1,6 +1,6 @@
 import { aCSV, descargar, resumen, type FrutoGuardado } from '../lib/lote'
 import { pct, veredicto } from '../lib/veredicto'
-import { Basura, Copiar, Descargar, Lista, Mas } from './Iconos'
+import { Basura, Copiar, Descargar } from './Iconos'
 
 interface Props {
   lote: FrutoGuardado[]
@@ -10,6 +10,8 @@ interface Props {
   irAAnalizar: () => void
 }
 
+const id = (n: number) => String(n).padStart(3, '0')
+
 export function Lote({ lote, quitar, vaciar, avisar, irAAnalizar }: Props) {
   const r = resumen(lote)
   const ancho = (n: number) => `${r.total ? (100 * n) / r.total : 0}%`
@@ -17,94 +19,105 @@ export function Lote({ lote, quitar, vaciar, avisar, irAAnalizar }: Props) {
   async function copiar() {
     const txt =
       `Lote de arándanos · ${new Date().toLocaleString('es')}\n` +
-      `Frutos: ${r.total} · Cumplen: ${r.ok} · Dudosos: ${r.duda} · No cumplen: ${r.mal} (${pct(r.pctMal)})\n\n` +
-      lote.map((f) => `#${f.n}\t${f.vistas} vista(s)\tP(desh) ${pct(f.p)}\t${veredicto(f.p)!.corto}`).join('\n')
+      `Muestras: ${r.total} · Cumplen: ${r.ok} · Dudosas: ${r.duda} · No cumplen: ${r.mal} (${pct(r.pctMal)})\n\n` +
+      lote.map((f) => `${id(f.n)}\t${f.vistas} vista(s)\t${pct(f.p)}\t${veredicto(f.p)!.corto}`).join('\n')
     try {
       await navigator.clipboard.writeText(txt)
       avisar('Resumen copiado al portapapeles')
     } catch {
-      avisar('No se pudo copiar automáticamente')
+      avisar('No se pudo copiar el resumen')
     }
   }
 
   function exportar() {
-    const fecha = new Date().toISOString().slice(0, 10)
-    descargar(`lote_arandanos_${fecha}.csv`, aCSV(lote))
+    descargar(`lote_arandanos_${new Date().toISOString().slice(0, 10)}.csv`, aCSV(lote))
   }
 
   function confirmarVaciar() {
-    if (window.confirm(`¿Vaciar el lote? Se borrarán ${r.total} fruto(s) guardados en este dispositivo.`)) {
+    if (window.confirm(`¿Vaciar el lote? Se eliminarán ${r.total} muestra(s) guardadas en este dispositivo.`)) {
       vaciar()
       avisar('Lote vaciado')
     }
   }
 
   return (
-    <div className="pila">
-      <section className="tarjeta">
-        <div className="tarjeta-cab">
-          <div>
-            <div className="eyebrow">Resumen del lote</div>
-            <h2>{r.total ? `${pct(r.pctMal)} defectuoso` : 'Lote vacío'}</h2>
+    <>
+      <div className="cab-pagina">
+        <div>
+          <h1>Lote</h1>
+          <p>Muestras guardadas en este dispositivo y proporción de frutos defectuosos.</p>
+        </div>
+        {r.total > 0 && (
+          <div className="acciones-lote">
+            <button className="btn sec peq" onClick={exportar}><Descargar size={16} /> Exportar CSV</button>
+            <button className="btn sec peq" onClick={copiar}><Copiar size={16} /> Copiar</button>
+            <button className="btn peligro peq" onClick={confirmarVaciar}><Basura size={16} /> Vaciar</button>
+          </div>
+        )}
+      </div>
+
+      <div className="panel">
+        <div className="cifras">
+          <div className="cifra"><span>Muestras</span><b>{r.total}</b></div>
+          <div className="cifra ok"><span>Cumplen</span><b>{r.ok}</b></div>
+          <div className="cifra duda"><span>Dudosas</span><b>{r.duda}</b></div>
+          <div className="cifra mal"><span>No cumplen</span><b>{r.mal}</b></div>
+        </div>
+        <div className="distribucion">
+          <div className="barra-lote" role="img" aria-label={`Cumplen ${r.ok}, dudosas ${r.duda}, no cumplen ${r.mal}`}>
+            <i className="ok" style={{ width: ancho(r.ok) }} />
+            <i className="duda" style={{ width: ancho(r.duda) }} />
+            <i className="mal" style={{ width: ancho(r.mal) }} />
+          </div>
+          <div className="leyenda">
+            <span className="calidad ok">Cumple</span>
+            <span className="calidad duda">Dudoso</span>
+            <span className="calidad mal">No cumple</span>
+            <span className="small muted" style={{ marginLeft: 'auto' }}>Defectuoso: <span className="mono">{pct(r.pctMal)}</span></span>
           </div>
         </div>
-        <div className="kpis">
-          <div className="kpi"><span>Frutos</span><b className="num">{r.total}</b></div>
-          <div className="kpi ok"><span>Cumplen</span><b className="num">{r.ok}</b></div>
-          <div className="kpi duda"><span>Dudosos</span><b className="num">{r.duda}</b></div>
-          <div className="kpi mal"><span>No cumplen</span><b className="num">{r.mal}</b></div>
-        </div>
-        <div className="barra-lote" role="img" aria-label={`Cumplen ${r.ok}, dudosos ${r.duda}, no cumplen ${r.mal}`}>
-          <i className="ok" style={{ width: ancho(r.ok) }} />
-          <i className="duda" style={{ width: ancho(r.duda) }} />
-          <i className="mal" style={{ width: ancho(r.mal) }} />
-        </div>
-        <div className="leyenda"><span className="ok">Cumple</span><span className="duda">Dudoso (revisar a mano)</span><span className="mal">No cumple</span></div>
-      </section>
+      </div>
 
-      <section className="tarjeta">
-        <div className="tarjeta-cab">
-          <h2>Frutos evaluados</h2>
-          {r.total > 0 && <span className="muted small">más recientes primero</span>}
-        </div>
-
+      <div className="panel">
         {!r.total ? (
           <div className="vacio-estado">
-            <Lista size={34} />
-            <h3>Aún no hay frutos guardados</h3>
-            <p className="small">Analiza un arándano y pulsa «Guardar y siguiente» para sumarlo al lote.</p>
-            <button className="btn" style={{ marginTop: 14 }} onClick={irAAnalizar}><Mas /> Analizar un fruto</button>
+            <h3>Todavía no hay muestras</h3>
+            <p>Evalúa un fruto y pulsa «Guardar en el lote» para registrarlo aquí.</p>
+            <button className="btn" onClick={irAAnalizar}>Evaluar una muestra</button>
           </div>
         ) : (
-          <>
-            <ul className="lista">
+          <table className="tabla-lote">
+            <thead>
+              <tr>
+                <th className="img-col"><span className="sr">Imagen</span></th>
+                <th>Muestra</th>
+                <th className="col-hora">Hora</th>
+                <th className="col-vistas r">Vistas</th>
+                <th className="r">P(desh.)</th>
+                <th>Resultado</th>
+                <th className="acc-col"><span className="sr">Acciones</span></th>
+              </tr>
+            </thead>
+            <tbody>
               {lote.slice().reverse().map((f) => {
                 const v = veredicto(f.p)!
                 return (
-                  <li key={f.n}>
-                    <img src={f.miniatura} alt="" />
-                    <div className="info">
-                      <b className="num">Fruto #{f.n}</b>
-                      <p>{f.vistas} vista{f.vistas > 1 ? 's' : ''} · {new Date(f.fecha).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}</p>
-                    </div>
-                    <div className="der">
-                      <span className={`chip ${v.clase}`}>{v.corto}</span>
-                      <span className="p num">{pct(f.p)}</span>
-                    </div>
-                    <button className="icon-btn" onClick={() => quitar(f.n)} aria-label={`Eliminar fruto ${f.n}`}><Basura size={17} /></button>
-                  </li>
+                  <tr key={f.n}>
+                    <td><img src={f.miniatura} alt="" /></td>
+                    <td className="mono">{id(f.n)}</td>
+                    <td className="col-hora mono muted">{new Date(f.fecha).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}</td>
+                    <td className="col-vistas r mono">{f.vistas}</td>
+                    <td className="r mono">{pct(f.p)}</td>
+                    <td><span className={`calidad ${v.clase}`}>{v.corto}</span></td>
+                    <td><button className="icon-btn" onClick={() => quitar(f.n)} aria-label={`Eliminar muestra ${f.n}`}><Basura size={16} /></button></td>
+                  </tr>
                 )
               })}
-            </ul>
-            <div className="fila-btn" style={{ marginTop: 14 }}>
-              <button className="btn sec peq" onClick={exportar}><Descargar size={17} /> Exportar CSV</button>
-              <button className="btn sec peq" onClick={copiar}><Copiar size={17} /> Copiar resumen</button>
-              <button className="btn peligro peq" onClick={confirmarVaciar}><Basura size={17} /> Vaciar lote</button>
-            </div>
-          </>
+            </tbody>
+          </table>
         )}
-      </section>
-      <p className="pie">El lote se guarda solo en este dispositivo. Ninguna foto ni resultado se envía a un servidor.</p>
-    </div>
+      </div>
+      <p className="pie">Los datos se guardan solo en este dispositivo y no se envían a ningún servidor.</p>
+    </>
   )
 }

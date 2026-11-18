@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { aDataURL, procesarFoto } from '../lib/procesar'
 import { clasificar } from '../lib/modelo'
 import { pct, UMBRAL_ALTO, UMBRAL_BAJO, veredicto } from '../lib/veredicto'
-import { Candado, Check, Cruz, Flecha } from './Iconos'
 import type { EstadoModelo } from '../App'
 
 interface Demo {
@@ -11,6 +10,16 @@ interface Demo {
   entrada: string
   p: number
 }
+
+const SECCIONES = [
+  ['resumen', 'Resumen'],
+  ['proceso', 'Proceso de análisis'],
+  ['decision', 'Regla de decisión'],
+  ['fotos', 'Toma de fotos'],
+  ['modelo', 'Modelo y resultados'],
+  ['limitaciones', 'Limitaciones'],
+  ['preguntas', 'Preguntas frecuentes'],
+] as const
 
 function DemoEnVivo({ estadoModelo }: { estadoModelo: EstadoModelo }) {
   const [demos, setDemos] = useState<Demo[]>([])
@@ -24,8 +33,7 @@ function DemoEnVivo({ estadoModelo }: { estadoModelo: EstadoModelo }) {
       const res: Demo[] = []
       for (const nombre of ['sano', 'deshidratado']) {
         const url = `${import.meta.env.BASE_URL}ejemplos/${nombre}.jpg`
-        const blob = await (await fetch(url)).blob()
-        const r = await procesarFoto(blob)
+        const r = await procesarFoto(await (await fetch(url)).blob())
         res.push({ nombre, original: url, entrada: aDataURL(r.entrada), p: await clasificar(r.entrada) })
       }
       setDemos(res)
@@ -38,27 +46,35 @@ function DemoEnVivo({ estadoModelo }: { estadoModelo: EstadoModelo }) {
 
   return (
     <div className="demo">
-      {!demos.length && (
+      {!demos.length ? (
         <button className="btn sec envolver" onClick={correr} disabled={cargando || estadoModelo === 'error'}>
-          {cargando ? <span className="girando" /> : null} {cargando ? 'Procesando ejemplos…' : 'Ejecutar el proceso con dos frutos reales'}
+          {cargando && <span className="girando" />}
+          {cargando ? 'Procesando…' : 'Ejecutar el análisis con dos muestras reales'}
         </button>
+      ) : (
+        <table className="demo-tabla">
+          <thead>
+            <tr><th>Foto original</th><th>Entrada al modelo</th><th>Resultado</th></tr>
+          </thead>
+          <tbody>
+            {demos.map((d) => {
+              const v = veredicto(d.p)!
+              return (
+                <tr key={d.nombre}>
+                  <td><img src={d.original} alt={`Fruto ${d.nombre}, foto original`} /></td>
+                  <td><img src={d.entrada} alt="Imagen preprocesada" /></td>
+                  <td>
+                    <span className={`calidad ${v.clase}`}>{v.corto}</span>
+                    <div className="mono small muted" style={{ marginTop: 2 }}>P = {pct(d.p)}</div>
+                    <div className="small muted">Etiqueta real: {d.nombre}</div>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
       )}
-      {error && <div className="aviso">{error}</div>}
-      {demos.map((d) => {
-        const v = veredicto(d.p)!
-        return (
-          <div className="demo-fila" key={d.nombre}>
-            <figure><img src={d.original} alt={`Foto original de un fruto ${d.nombre}`} /><figcaption>Foto · {d.nombre}</figcaption></figure>
-            <Flecha className="muted" />
-            <figure><img src={d.entrada} alt="Imagen preprocesada" /><figcaption>Entrada al modelo</figcaption></figure>
-            <div className="demo-res">
-              <span className={`chip ${v.clase}`}>{v.corto}</span>
-              <b className="num" style={{ marginTop: 6 }}>{pct(d.p)}</b>
-              <span className="small muted">P(desh.)</span>
-            </div>
-          </div>
-        )
-      })}
+      {error && <div className="nota error" style={{ marginTop: 10 }}>{error}</div>}
     </div>
   )
 }
@@ -67,148 +83,167 @@ export function ComoFunciona({ estadoModelo }: { estadoModelo: EstadoModelo }) {
   const bajo = Math.round(UMBRAL_BAJO * 100)
   const alto = Math.round(UMBRAL_ALTO * 100)
 
+  const ir = (e: React.MouseEvent, id: string) => {
+    e.preventDefault()
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   return (
-    <div className="guia">
-      <section className="tarjeta guia-hero">
-        <div className="eyebrow">Cómo funciona</div>
-        <h2>Detección de deshidratación en arándanos con visión artificial</h2>
-        <p>
-          La app analiza la foto de un arándano y estima la probabilidad de que esté <b>deshidratado</b>, es decir, que
-          presente <b>arrugamiento visible</b> de la piel (<i>shriveling</i>), un defecto definido visualmente en los
-          estándares de calidad del USDA para arándanos. Todo el análisis ocurre en tu teléfono.
-        </p>
-      </section>
-
-      <section className="tarjeta">
-        <div className="tarjeta-cab"><h2>El proceso, paso a paso</h2></div>
-        <ol className="pasos">
-          <li>
-            <h3>Captura</h3>
-            <p>Fotografías el fruto sobre un fondo gris claro. Puedes tomar hasta tres vistas: corona (V1), cicatriz del pedúnculo (V2) y lateral (V3).</p>
-          </li>
-          <li>
-            <h3>Localización del fruto</h3>
-            <p>Sobre una copia reducida de la foto se detecta la región más oscura que el fondo (el fruto) y se recorta un cuadrado de unas dos veces su tamaño.</p>
-          </li>
-          <li>
-            <h3>Normalización de color</h3>
-            <p>Se mide el fondo en los bordes del recorte y se ajusta cada canal para que el fondo quede en un gris de referencia (140). Así se corrigen exposición y balance de blancos.</p>
-          </li>
-          <li>
-            <h3>Segmentación y fondo neutro</h3>
-            <p>Se separa el fruto del fondo, se suaviza su contorno con una envolvente convexa y el fondo se reemplaza por gris uniforme (128). Esto evita que el modelo aprenda «atajos» como manchas o tonos de la cartulina en lugar de las arrugas.</p>
-          </li>
-          <li>
-            <h3>Clasificación con YOLOv11</h3>
-            <p>La imagen de 320 × 320 px entra a una red neuronal YOLOv11n-cls entrenada con fotos propias. Devuelve la probabilidad de cada clase: sano o deshidratado.</p>
-          </li>
-          <li>
-            <h3>Veredicto del fruto</h3>
-            <p>Si tomaste varias vistas, se promedia la probabilidad de deshidratado y se aplica la regla de decisión de abajo. El fruto se puede guardar en el lote para obtener el porcentaje de defectuosos.</p>
-          </li>
+    <div className="doc">
+      <nav className="indice" aria-label="Contenido">
+        <p>En esta página</p>
+        <ol>
+          {SECCIONES.map(([id, t]) => (
+            <li key={id}><a href={`#${id}`} onClick={(e) => ir(e, id)}>{t}</a></li>
+          ))}
         </ol>
-      </section>
+      </nav>
 
-      <section className="tarjeta">
-        <div className="tarjeta-cab"><h2>Míralo en acción</h2></div>
-        <p className="small muted" style={{ marginBottom: 12 }}>Estas dos fotos son del dataset de entrenamiento. El botón ejecuta exactamente el mismo proceso que se aplica a tus fotos.</p>
-        <DemoEnVivo estadoModelo={estadoModelo} />
-      </section>
+      <article className="articulo">
+        <section id="resumen">
+          <h1>Cómo funciona</h1>
+          <p className="bajada">
+            Arándano QC estima, a partir de una fotografía, la probabilidad de que un arándano esté deshidratado,
+            es decir, que presente arrugamiento visible de la piel (<i>shriveling</i>), defecto definido visualmente en los
+            estándares de calidad del USDA para arándanos.
+          </p>
+          <p>
+            El análisis se ejecuta por completo en el dispositivo: la imagen no se envía a ningún servidor. Basta una foto por
+            fruto; si el resultado no es concluyente, la aplicación pide una vista adicional desde otro ángulo.
+          </p>
+        </section>
 
-      <section className="tarjeta">
-        <div className="tarjeta-cab"><h2>Regla de decisión</h2></div>
-        <p className="small muted">Se usa P(deshidratado), la probabilidad que asigna el modelo a la clase defectuosa, con una franja intermedia para no forzar decisiones dudosas.</p>
-        <div className="umbrales">
-          <div className="umbral ok"><b>Cumple</b><span>P &lt; {bajo} %</span></div>
-          <div className="umbral duda"><b>Dudoso</b><span>{bajo} – {alto} %, revisar a mano</span></div>
-          <div className="umbral mal"><b>No cumple</b><span>P ≥ {alto} %</span></div>
-        </div>
-      </section>
+        <section id="proceso">
+          <h2>Proceso de análisis</h2>
+          <ol className="pasos">
+            <li><span className="n">01</span><div><h3>Captura</h3><p>Se fotografía un fruto sobre una cartulina gris claro. Sirve cualquier vista: corona, cicatriz del pedúnculo o lateral.</p></div></li>
+            <li><span className="n">02</span><div><h3>Localización</h3><p>En una copia reducida de la imagen se detecta la región más oscura que el fondo y se recorta un cuadrado de aproximadamente el doble del tamaño del fruto.</p></div></li>
+            <li><span className="n">03</span><div><h3>Normalización de color</h3><p>Se mide el fondo en los bordes del recorte y se escala cada canal para llevarlo a un gris de referencia (140), corrigiendo exposición y balance de blancos.</p></div></li>
+            <li><span className="n">04</span><div><h3>Segmentación</h3><p>Se separa el fruto del fondo, se regulariza el contorno con una envolvente convexa y el fondo se sustituye por gris uniforme (128). Así el modelo no puede apoyarse en manchas o tonos de la cartulina.</p></div></li>
+            <li><span className="n">05</span><div><h3>Clasificación</h3><p>La imagen de 320 × 320 px se evalúa con una red YOLOv11n-cls, que devuelve la probabilidad de las clases «sano» y «deshidratado».</p></div></li>
+            <li><span className="n">06</span><div><h3>Veredicto</h3><p>Se aplica la regla de decisión. Si hay varias vistas del mismo fruto, se promedian sus probabilidades.</p></div></li>
+          </ol>
+          <h3>Ejemplo</h3>
+          <p>El siguiente botón ejecuta el mismo procedimiento sobre dos fotos del conjunto de datos.</p>
+          <DemoEnVivo estadoModelo={estadoModelo} />
+        </section>
 
-      <section className="tarjeta">
-        <div className="tarjeta-cab"><h2>Cómo tomar la foto</h2></div>
-        <div className="dos-col">
-          <div>
-            <h4>Sí</h4>
-            <ul className="lista-check si">
-              <li><Check size={16} />Cartulina gris claro mate, limpia.</li>
-              <li><Check size={16} />Un solo fruto, centrado, de 1/5 a 1/3 del ancho de la foto.</li>
-              <li><Check size={16} />Luz difusa y pareja (junto a una ventana, sin sol directo).</li>
-              <li><Check size={16} />Celular quieto y paralelo a la mesa; espera a que enfoque.</li>
-            </ul>
+        <section id="decision">
+          <h2>Regla de decisión</h2>
+          <p>Se usa la probabilidad de deshidratación P que entrega el modelo, con una franja intermedia para no forzar una decisión cuando el modelo no es concluyente.</p>
+          <div className="tabla-wrap" style={{ marginTop: 12 }}>
+            <table className="tabla">
+              <thead><tr><th>P(deshidratado)</th><th>Resultado</th><th>Acción</th></tr></thead>
+              <tbody>
+                <tr><td className="mono">&lt; {bajo} %</td><td><span className="calidad ok">Cumple</span></td><td>Fruto aceptado</td></tr>
+                <tr><td className="mono">{bajo} – {alto} %</td><td><span className="calidad duda">Dudoso</span></td><td>Agregar otra vista o revisar manualmente</td></tr>
+                <tr><td className="mono">≥ {alto} %</td><td><span className="calidad mal">No cumple</span></td><td>Fruto rechazado</td></tr>
+              </tbody>
+            </table>
           </div>
-          <div>
-            <h4>No</h4>
-            <ul className="lista-check no">
-              <li><Cruz size={16} />Flash o sombras duras junto al fruto.</li>
-              <li><Cruz size={16} />Fondos con textura, color o manchas de jugo.</li>
-              <li><Cruz size={16} />Varios frutos u objetos en la foto.</li>
-              <li><Cruz size={16} />El fruto ocupando casi toda la imagen o desenfocado.</li>
-            </ul>
+        </section>
+
+        <section id="fotos">
+          <h2>Toma de fotos</h2>
+          <p>El modelo se entrenó con fotos en condiciones controladas. Mientras más se parezca la foto a esas condiciones, más confiable será el resultado.</p>
+          <div className="dos-col">
+            <div>
+              <h3>Recomendado</h3>
+              <ul className="lista-doc">
+                <li>Cartulina gris claro mate y limpia.</li>
+                <li>Un solo fruto, centrado, de 1/5 a 1/3 del ancho de la imagen.</li>
+                <li>Luz difusa y pareja, por ejemplo junto a una ventana.</li>
+                <li>Celular estable y paralelo a la mesa.</li>
+              </ul>
+            </div>
+            <div>
+              <h3>Evitar</h3>
+              <ul className="lista-doc">
+                <li>Flash, sol directo o sombras marcadas.</li>
+                <li>Fondos con textura, color o manchas de jugo.</li>
+                <li>Varios frutos u otros objetos en la imagen.</li>
+                <li>Fruto desenfocado o que ocupe casi toda la foto.</li>
+              </ul>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="tarjeta">
-        <div className="tarjeta-cab"><h2>El modelo</h2></div>
-        <div className="prosa">
-          <p>Se usó <b>YOLOv11n-cls</b> (Ultralytics), la variante más ligera de la familia, entrenada 60 épocas a 320 px partiendo de pesos preentrenados. El modelo exportado a ONNX pesa unos 6 MB y corre en el navegador con ONNX Runtime Web.</p>
-          <p>La división en entrenamiento, validación y prueba se hizo <b>por fruto</b> (las tres vistas de un arándano quedan siempre en el mismo conjunto) para que el modelo nunca se evalúe con un fruto que ya vio.</p>
-        </div>
-        <div className="tabla-wrap" style={{ marginTop: 14 }}>
-          <table>
-            <thead><tr><th>Conjunto</th><th className="r">Sanos</th><th className="r">Deshidratados</th><th className="r">Total</th></tr></thead>
-            <tbody className="num">
-              <tr><td>Entrenamiento</td><td className="r">517</td><td className="r">582</td><td className="r">1 099</td></tr>
-              <tr><td>Validación</td><td className="r">113</td><td className="r">126</td><td className="r">239</td></tr>
-              <tr><td>Prueba</td><td className="r">110</td><td className="r">125</td><td className="r">235</td></tr>
-              <tr><td><b>Total</b></td><td className="r"><b>740</b></td><td className="r"><b>833</b></td><td className="r"><b>1 573</b></td></tr>
-            </tbody>
-          </table>
-        </div>
-        <p className="small muted" style={{ marginTop: 8 }}>Imágenes de 529 frutos (249 sanos y 280 deshidratados), fotografiados con cámara réflex en laboratorio.</p>
+        <section id="modelo">
+          <h2>Modelo y resultados</h2>
+          <p>
+            Se utilizó YOLOv11n-cls (Ultralytics), la variante más ligera de la familia, entrenada durante 60 épocas con
+            imágenes de 320 px a partir de pesos preentrenados. Exportado a ONNX ocupa unos 6 MB y se ejecuta en el navegador con ONNX Runtime Web.
+          </p>
+          <p>
+            La partición en entrenamiento, validación y prueba se hizo por fruto: las vistas de un mismo arándano pertenecen siempre al mismo conjunto,
+            de modo que el modelo nunca se evalúa con un fruto que ya vio.
+          </p>
 
-        <h3 style={{ fontSize: '0.95rem', margin: '18px 0 10px' }}>Resultados</h3>
-        <div className="metricas">
-          <div className="metrica"><b className="num">235/235</b><span>fotos de prueba bien clasificadas</span></div>
-          <div className="metrica"><b className="num">79/79</b><span>frutos de prueba bien clasificados</span></div>
-          <div className="metrica"><b className="num">99,9 %</b><span>exactitud media por foto en validación cruzada (5 folds)</span></div>
-          <div className="metrica"><b className="num">100 %</b><span>exactitud por fruto en los 5 folds</span></div>
-        </div>
-        <p className="small muted" style={{ marginTop: 10 }}>
-          En el conjunto de prueba, la probabilidad más alta asignada a un fruto sano fue 4,7 % y la más baja asignada a uno deshidratado fue 99,5 %: ninguna foto cayó en la franja dudosa.
-        </p>
-      </section>
+          <h3>Conjunto de datos</h3>
+          <div className="tabla-wrap">
+            <table className="tabla">
+              <thead><tr><th>Conjunto</th><th className="r">Sanos</th><th className="r">Deshidratados</th><th className="r">Imágenes</th></tr></thead>
+              <tbody className="mono">
+                <tr><td>Entrenamiento</td><td className="r">517</td><td className="r">582</td><td className="r">1 099</td></tr>
+                <tr><td>Validación</td><td className="r">113</td><td className="r">126</td><td className="r">239</td></tr>
+                <tr><td>Prueba</td><td className="r">110</td><td className="r">125</td><td className="r">235</td></tr>
+              </tbody>
+              <tfoot className="mono"><tr><td>Total</td><td className="r">740</td><td className="r">833</td><td className="r">1 573</td></tr></tfoot>
+            </table>
+          </div>
+          <p className="small muted" style={{ marginTop: 8 }}>1 573 imágenes de 529 frutos (249 sanos y 280 deshidratados), tomadas con cámara réflex en laboratorio.</p>
 
-      <section className="tarjeta">
-        <div className="tarjeta-cab"><h2>Limitaciones</h2></div>
-        <div className="prosa">
-          <p>Los resultados anteriores se obtuvieron en condiciones de laboratorio: misma cámara, misma cartulina y luz controlada. Con la cámara de un celular y otra iluminación la precisión puede ser menor; por eso la app reproduce el preprocesamiento del dataset y marca como dudosos los casos intermedios.</p>
-          <p>La clase se asignó por <b>inspección visual</b> del arrugamiento; no se midió la pérdida de peso. Es un <b>prototipo de investigación</b> y no reemplaza la inspección oficial de calidad.</p>
-        </div>
-      </section>
+          <h3>Resultados en el conjunto de prueba</h3>
+          <div className="tabla-wrap">
+            <table className="tabla">
+              <thead><tr><th>Evaluación</th><th className="r">Aciertos</th><th className="r">Exactitud</th></tr></thead>
+              <tbody className="mono">
+                <tr><td>Por foto (una vista)</td><td className="r">235 / 235</td><td className="r">100 %</td></tr>
+                <tr><td>Por fruto (promedio de vistas)</td><td className="r">79 / 79</td><td className="r">100 %</td></tr>
+                <tr><td>Validación cruzada, 5 folds, por foto</td><td className="r">—</td><td className="r">99,9 %</td></tr>
+                <tr><td>Validación cruzada, 5 folds, por fruto</td><td className="r">—</td><td className="r">100 %</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p style={{ marginTop: 10 }}>
+            Cada vista por separado (corona, cicatriz y lateral) acertó todos los casos de prueba, por lo que una sola foto es suficiente.
+            La probabilidad más alta asignada a un fruto sano fue 4,7 % y la más baja asignada a uno deshidratado fue 99,5 %.
+          </p>
+        </section>
 
-      <section className="tarjeta">
-        <div className="tarjeta-cab"><h2>Preguntas frecuentes</h2></div>
-        <details className="faq">
-          <summary>¿Necesito internet?</summary>
-          <p>Solo la primera vez, para descargar la app y el modelo (unos 20 MB). Después funciona sin conexión. En el celular puedes instalarla desde el menú del navegador con «Agregar a pantalla de inicio».</p>
-        </details>
-        <details className="faq">
-          <summary>¿Por qué tres vistas?</summary>
-          <p>El arrugamiento no siempre se ve igual desde todos los ángulos. Promediar la corona, la cicatriz y el lateral da un veredicto más estable que una sola foto. Con una vista basta para obtener un resultado.</p>
-        </details>
-        <details className="faq">
-          <summary>¿Por qué el fondo de la imagen procesada es gris?</summary>
-          <p>Es intencional: el modelo se entrenó con el fondo reemplazado por gris uniforme para que se fije en la piel del fruto y no en la cartulina. Si el recorte se ve mal (fruto cortado o con fondo), repite la foto con mejor luz.</p>
-        </details>
-        <details className="faq">
-          <summary>¿Qué pasa con mis fotos?</summary>
-          <p>Nada sale del teléfono. Las fotos se procesan en el navegador y el lote se guarda en el almacenamiento local del dispositivo. Puedes exportarlo a CSV o vaciarlo cuando quieras.</p>
-        </details>
-      </section>
+        <section id="limitaciones">
+          <h2>Limitaciones</h2>
+          <p>
+            Los resultados anteriores corresponden a condiciones de laboratorio: misma cámara, misma cartulina y luz controlada. Con la cámara
+            de un celular y otra iluminación el desempeño puede ser menor. Por eso la aplicación replica el preprocesamiento del conjunto de datos
+            y reserva una franja de resultados dudosos.
+          </p>
+          <p>
+            La clase se asignó por inspección visual del arrugamiento; no se midió la pérdida de peso. Se trata de un prototipo de investigación
+            que no sustituye la inspección oficial de calidad.
+          </p>
+        </section>
 
-      <p className="pie"><Candado size={13} style={{ verticalAlign: '-2px' }} /> Procesamiento 100 % local · YOLOv11n-cls · ONNX Runtime Web</p>
+        <section id="preguntas">
+          <h2>Preguntas frecuentes</h2>
+          <details className="faq">
+            <summary>¿Cuántas fotos necesito por fruto?</summary>
+            <p>Una. Si el resultado es «Dudoso», la aplicación sugiere agregar otra vista del mismo fruto (hasta tres) y promedia los resultados.</p>
+          </details>
+          <details className="faq">
+            <summary>¿Necesito conexión a internet?</summary>
+            <p>Solo la primera vez, para descargar la aplicación y el modelo (unos 20 MB). Después funciona sin conexión. En el celular se puede instalar desde el menú del navegador con «Agregar a la pantalla de inicio».</p>
+          </details>
+          <details className="faq">
+            <summary>¿Por qué la imagen procesada tiene fondo gris?</summary>
+            <p>El modelo se entrenó con el fondo reemplazado por gris uniforme para que se concentre en la piel del fruto. Si el recorte aparece cortado o con restos de fondo, conviene repetir la foto con mejor luz.</p>
+          </details>
+          <details className="faq">
+            <summary>¿Qué pasa con mis fotos y resultados?</summary>
+            <p>Las fotos se procesan en el navegador y no se guardan. El lote se almacena en el propio dispositivo y puede exportarse a CSV o vaciarse en cualquier momento.</p>
+          </details>
+        </section>
+      </article>
     </div>
   )
 }

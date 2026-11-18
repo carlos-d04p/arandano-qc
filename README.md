@@ -2,7 +2,7 @@
 
 Aplicación web (PWA) que detecta **arándanos deshidratados** (con arrugamiento visible) a partir de una foto, usando un clasificador **YOLOv11n-cls** que corre directamente en el navegador del celular. Las fotos no se envían a ningún servidor.
 
-- **Analizar**: toma de 1 a 3 vistas del fruto (corona, cicatriz y lateral). La app las preprocesa igual que el dataset, las clasifica y promedia la probabilidad.
+- **Evaluar**: basta una foto del fruto desde cualquier ángulo. La app la preprocesa igual que el dataset y la clasifica. Si el resultado es dudoso, sugiere agregar otra vista (hasta 3) y promedia las probabilidades.
 - **Lote**: guarda los frutos evaluados en el dispositivo, calcula el % defectuoso y exporta a CSV.
 - **Cómo funciona**: explica el proceso paso a paso, la regla de decisión, cómo tomar la foto, el modelo, sus resultados y sus limitaciones, con una demostración en vivo.
 
@@ -10,7 +10,7 @@ Aplicación web (PWA) que detecta **arándanos deshidratados** (con arrugamiento
 
 | Parte | Herramienta |
 |---|---|
-| Interfaz | React 19 + TypeScript, compilado con Vite 8 |
+| Interfaz | React 19 + TypeScript, compilado con Vite 8; tipografía IBM Plex (incluida, sin CDN) |
 | Modelo | `public/modelo/best.onnx`, YOLOv11n-cls exportado desde Ultralytics (entrada 1×3×320×320, salida [deshidratado, sano]) |
 | Inferencia | ONNX Runtime Web (WebAssembly) |
 | Preprocesamiento | `src/lib/nucleo.js`, réplica en JavaScript de `procesar.py` + `armar_dataset.py`, ejecutado en un Web Worker |
@@ -62,7 +62,7 @@ public/
   ejemplos/               dos fotos reales para la demostración
 src/
   App.tsx                 navegación y estado del modelo
-  components/             Analizar, Lote, ComoFunciona, Escala, Iconos
+  components/             Analizar (Evaluar), Lote, ComoFunciona, Escala, Iconos
   lib/nucleo.js           preprocesamiento (igual que el dataset)
   lib/preproceso.worker.ts
   lib/procesar.ts         decodifica la foto, localiza y recorta el fruto

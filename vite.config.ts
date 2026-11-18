@@ -13,8 +13,8 @@ export default defineConfig({
         short_name: 'Arándano QC',
         description: 'Detecta arándanos deshidratados (arrugamiento) con visión artificial, directamente en el celular.',
         lang: 'es',
-        theme_color: '#463b6c',
-        background_color: '#f6f5fa',
+        theme_color: '#ffffff',
+        background_color: '#f6f6f8',
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/',
@@ -28,7 +28,7 @@ export default defineConfig({
       },
       workbox: {
         // La app, el modelo (6 MB) y el motor WebAssembly (~15 MB, 4 MB comprimido) quedan guardados para usarla sin conexión.
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,onnx,wasm}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,onnx,wasm,woff2}'],
         maximumFileSizeToCacheInBytes: 30 * 1024 * 1024,
         navigateFallback: '/index.html',
       },
