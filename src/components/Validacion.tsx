@@ -270,7 +270,7 @@ export function Validacion({ estadoModelo, avisar }: Props) {
                       <dt>Predicción</dt><dd>{ultimo.p >= 0.5 ? 'Deshidratado' : 'Sano'} <span className="mono muted">({pct(ultimo.p)})</span></dd>
                       <dt>Resultado</dt>
                       <dd>{(ultimo.p >= 0.5 ? 'deshidratado' : 'sano') === ultimo.real ? <span className="calidad ok">Acierto</span> : <span className="calidad mal">Error</span>}</dd>
-                      <dt>Calidad</dt>
+                      <dt>Calidad de la foto</dt>
                       <dd>{ultimo.avisos?.length ? <span className="calidad duda">Con advertencias</span> : <span className="calidad ok">Adecuada</span>}</dd>
                     </dl>
                   </div>

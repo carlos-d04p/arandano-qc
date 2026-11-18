@@ -271,7 +271,7 @@ function Informe({ lote, datos, dc, r }: { lote: FrutoGuardado[]; datos: DatosLo
 
       <table className="inf-tabla">
         <thead>
-          <tr><th>Muestra</th><th>Hora</th><th className="r">Vistas</th><th className="r">P(desh.)</th><th>Resultado</th><th>Otros defectos</th><th>Foto</th><th>Defectuoso</th></tr>
+          <tr><th>Muestra</th><th>Hora</th><th className="r">Vistas</th><th className="r">P(desh.)</th><th>Resultado</th><th>Otros defectos</th><th>Calidad de foto</th><th>Defectuoso</th></tr>
         </thead>
         <tbody>
           {lote.map((f) => (
