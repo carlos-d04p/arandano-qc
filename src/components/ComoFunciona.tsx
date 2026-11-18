@@ -17,6 +17,7 @@ const SECCIONES = [
   ['decision', 'Regla de decisión'],
   ['fotos', 'Toma de fotos'],
   ['modelo', 'Modelo y resultados'],
+  ['validacion-campo', 'Validación con celular'],
   ['limitaciones', 'Limitaciones'],
   ['preguntas', 'Preguntas frecuentes'],
 ] as const
@@ -211,12 +212,30 @@ export function ComoFunciona({ estadoModelo }: { estadoModelo: EstadoModelo }) {
           </p>
         </section>
 
+        <section id="validacion-campo">
+          <h2>Validación con celular</h2>
+          <p>
+            La sección <b>Validación</b> permite medir el desempeño del modelo con las fotos y el celular que se usarán en la práctica,
+            fuera de las condiciones de laboratorio del entrenamiento.
+          </p>
+          <ol className="lista-doc" style={{ marginTop: 10 }}>
+            <li>Separa frutos cuya clase conozcas por inspección visual (idealmente al menos 30 de cada clase).</li>
+            <li>Para cada fruto, marca su clase real <i>antes</i> de tomar la foto; así la etiqueta no se ve influida por la predicción.</li>
+            <li>Opcionalmente agrega hasta dos vistas más del mismo fruto para obtener también las métricas por fruto.</li>
+            <li>Exporta el CSV o copia el resumen: incluye exactitud con intervalo de confianza al 95 % (Wilson), sensibilidad, especificidad, precisión, F1, matriz de confusión y fotos rechazadas.</li>
+          </ol>
+          <p style={{ marginTop: 10 }}>
+            Las métricas usan el umbral de 50 % con «deshidratado» como clase positiva, igual que la evaluación del cuaderno de entrenamiento,
+            por lo que los resultados de laboratorio y de celular son directamente comparables.
+          </p>
+        </section>
+
         <section id="limitaciones">
           <h2>Limitaciones</h2>
           <p>
             Los resultados anteriores corresponden a condiciones de laboratorio: misma cámara, misma cartulina y luz controlada. Con la cámara
-            de un celular y otra iluminación el desempeño puede ser menor. Por eso la aplicación replica el preprocesamiento del conjunto de datos
-            y reserva una franja de resultados dudosos.
+            de un celular y otra iluminación el desempeño puede ser menor. Por eso la aplicación replica el preprocesamiento del conjunto de datos,
+            reserva una franja de resultados dudosos e incluye la sección Validación para cuantificar el desempeño en esas condiciones.
           </p>
           <p>
             La clase se asignó por inspección visual del arrugamiento; no se midió la pérdida de peso. Se trata de un prototipo de investigación

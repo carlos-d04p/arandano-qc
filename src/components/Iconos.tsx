@@ -26,7 +26,10 @@ export const Lista = (p: P) => (
 export const Info = (p: P) => (
   <Base {...p}><circle cx="12" cy="12" r="9.5" /><path d="M12 16.5v-5M12 8h.01" /></Base>
 )
-export const Check = (p: P) => (<Base {...p}><path d="M20 6 9 17l-5-5" /></Base>)
+export const Matriz = (p: P) => (
+  <Base {...p}><rect x="3.5" y="3.5" width="17" height="17" rx="2" /><path d="M12 3.5v17M3.5 12h17" /><path d="m6.5 7.5 1.5 1.5 2.5-3" /></Base>
+)
+export const Check =(p: P) => (<Base {...p}><path d="M20 6 9 17l-5-5" /></Base>)
 export const Cruz = (p: P) => (<Base {...p}><path d="M18 6 6 18M6 6l12 12" /></Base>)
 export const Alerta = (p: P) => (
   <Base {...p}><path d="M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /><path d="M12 9.5v4M12 17h.01" /></Base>

@@ -115,6 +115,15 @@ export async function procesarFoto(fuente: Blob): Promise<FotoProcesada> {
   return { entrada: new ImageData(new Uint8ClampedArray(p.data), ENTRADA, ENTRADA), original, tamRelativo }
 }
 
+/** Miniatura JPEG pequeña de una imagen ya preprocesada (para guardar en el dispositivo). */
+export function miniaturaDe(img: ImageData, lado = 72): string {
+  const c = lienzo(img.width, img.height)
+  c.putImageData(img, 0, 0)
+  const m = lienzo(lado, lado)
+  m.drawImage(c.canvas, 0, 0, lado, lado)
+  return m.canvas.toDataURL('image/jpeg', 0.72)
+}
+
 export function aDataURL(img: ImageData, calidad = 0.85): string {
   const c = lienzo(img.width, img.height)
   c.putImageData(img, 0, 0)

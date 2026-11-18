@@ -2,22 +2,24 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Analizar } from './components/Analizar'
 import { ComoFunciona } from './components/ComoFunciona'
 import { Lote } from './components/Lote'
-import { Escanear, Info, Lista, Logo } from './components/Iconos'
+import { Validacion } from './components/Validacion'
+import { Escanear, Info, Lista, Logo, Matriz } from './components/Iconos'
 import { cargarModelo } from './lib/modelo'
 import { useLote } from './lib/lote'
 
 export type EstadoModelo = 'cargando' | 'listo' | 'error'
-type Pestana = 'analizar' | 'lote' | 'guia'
+type Pestana = 'analizar' | 'lote' | 'validacion' | 'guia'
 
 const PESTANAS: { id: Pestana; titulo: string; Icono: typeof Escanear }[] = [
   { id: 'analizar', titulo: 'Evaluar', Icono: Escanear },
   { id: 'lote', titulo: 'Lote', Icono: Lista },
+  { id: 'validacion', titulo: 'Validación', Icono: Matriz },
   { id: 'guia', titulo: 'Cómo funciona', Icono: Info },
 ]
 
 function pestanaInicial(): Pestana {
   const h = location.hash.slice(1)
-  return h === 'lote' || h === 'guia' ? h : 'analizar'
+  return h === 'lote' || h === 'validacion' || h === 'guia' ? h : 'analizar'
 }
 
 export default function App() {
@@ -47,7 +49,7 @@ export default function App() {
   useEffect(() => {
     const f = () => {
       const p = location.hash.slice(1)
-      if (p === 'lote' || p === 'guia' || p === '') setPestana(pestanaInicial())
+      if (p === 'lote' || p === 'validacion' || p === 'guia' || p === '') setPestana(pestanaInicial())
     }
     window.addEventListener('hashchange', f)
     return () => window.removeEventListener('hashchange', f)
@@ -113,6 +115,10 @@ export default function App() {
           />
         </div>
         {pestana === 'lote' && <Lote lote={lote} quitar={quitar} vaciar={vaciar} avisar={avisar} irAAnalizar={() => ir('analizar')} />}
+        {/* Validación también queda montada para no perder el registro en curso */}
+        <div hidden={pestana !== 'validacion'}>
+          <Validacion estadoModelo={estadoModelo} avisar={avisar} />
+        </div>
         {pestana === 'guia' && <ComoFunciona estadoModelo={estadoModelo} />}
       </main>
 
