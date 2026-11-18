@@ -3,7 +3,8 @@
 Aplicación web (PWA) que detecta **arándanos deshidratados** (con arrugamiento visible) a partir de una foto, usando un clasificador **YOLOv11n-cls** que corre directamente en el navegador del celular. Las fotos no se envían a ningún servidor.
 
 - **Evaluar**: basta una foto del fruto desde cualquier ángulo. La app revisa la calidad de la foto (varios objetos, forma, desenfoque, tamaño, exposición, fondo), la preprocesa igual que el dataset y la clasifica. Si el resultado es dudoso, sugiere agregar otra vista (hasta 3) y promedia las probabilidades.
-- **Lote**: guarda los frutos evaluados en el dispositivo, calcula el % defectuoso y exporta a CSV.
+- **Otros defectos (experimental)**: además del modelo, revisa la forma y el color del fruto para marcar contornos irregulares (abolladuras, deformaciones) y zonas rojizas (heridas, pulpa expuesta, exudado). Calibrado con las 1573 fotos del dataset: 0,4 % de falsas alarmas en frutos sanos.
+- **Lote**: guarda los frutos evaluados en el dispositivo junto con los datos del lote (código, productor, variedad, fecha, responsable). Emite un dictamen (aceptado, rechazado o muestra insuficiente) según una tolerancia de defectuosos configurable, con IC 95 %. Exporta a CSV y genera un informe imprimible o en PDF.
 - **Validación**: mide el desempeño del modelo con fotos de celular. Se marca la clase real de cada fruto antes de fotografiarlo y la app calcula exactitud (con IC 95 % de Wilson), sensibilidad, especificidad, precisión, F1 y matriz de confusión, por foto y por fruto. Exporta a CSV.
 - **Cómo funciona**: explica el proceso paso a paso, la regla de decisión, cómo tomar la foto, el modelo, sus resultados y sus limitaciones, con una demostración en vivo.
 
@@ -61,9 +62,10 @@ Después de reentrenar en Colab (`entrenar_yolo_colab.ipynb`), reemplaza `public
 public/
   modelo/best.onnx        modelo entrenado
   ejemplos/               dos fotos reales para la demostración
+  og.png                  imagen para la vista previa al compartir el enlace
 src/
   App.tsx                 navegación y estado del modelo
-  components/             Analizar (Evaluar), Lote, ComoFunciona, Escala, Iconos
+  components/             Analizar (Evaluar), Lote, Validacion, ComoFunciona, Escala, Iconos
   lib/nucleo.js           preprocesamiento (igual que el dataset)
   lib/preproceso.worker.ts
   lib/procesar.ts         decodifica la foto, localiza y recorta el fruto
@@ -72,6 +74,7 @@ src/
   lib/lote.ts             lote guardado en el dispositivo y exportación CSV
   lib/validacion.ts       registros de validación, métricas y exportación
   lib/calidad.ts          control de calidad de la foto (umbrales calibrados con el dataset)
+  lib/defectos.ts         inspección complementaria de otros defectos (forma y color)
 ```
 
 ## Limitaciones

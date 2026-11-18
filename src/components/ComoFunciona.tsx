@@ -16,11 +16,14 @@ const SECCIONES = [
   ['proceso', 'Proceso de análisis'],
   ['decision', 'Regla de decisión'],
   ['calidad', 'Control de calidad de la foto'],
+  ['defectos', 'Otros defectos (experimental)'],
+  ['lote', 'Lote y criterio de aceptación'],
   ['fotos', 'Toma de fotos'],
   ['modelo', 'Modelo y resultados'],
   ['validacion-campo', 'Validación con celular'],
   ['limitaciones', 'Limitaciones'],
   ['preguntas', 'Preguntas frecuentes'],
+  ['acerca', 'Acerca de'],
 ] as const
 
 function DemoEnVivo({ estadoModelo }: { estadoModelo: EstadoModelo }) {
@@ -182,6 +185,59 @@ export function ComoFunciona({ estadoModelo }: { estadoModelo: EstadoModelo }) {
           </p>
         </section>
 
+        <section id="defectos">
+          <h2>Otros defectos (experimental)</h2>
+          <p>
+            El modelo solo fue entrenado para distinguir frutos sanos de deshidratados. Para no pasar por alto otros problemas, la aplicación
+            hace además una revisión de la forma y el color del fruto, sin inteligencia artificial, y marca «Revisar» cuando encuentra algo fuera
+            de lo habitual. No cambia el veredicto de deshidratación: es un aviso para confirmar a simple vista.
+          </p>
+          <div className="tabla-wrap" style={{ marginTop: 12 }}>
+            <table className="tabla">
+              <thead><tr><th>Indicador</th><th>Qué puede señalar</th><th>Criterio</th></tr></thead>
+              <tbody>
+                <tr><td>Contorno irregular</td><td>Abolladura, deformación, arrugas profundas o pedicelo adherido</td><td>Área / envolvente convexa del contorno &lt; 0,978</td></tr>
+                <tr><td>Zonas rojizas</td><td>Herida, rajadura, pulpa expuesta o jugo (exudado)</td><td>Más del 0,5 % de la piel con tono rojo-morado</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <h3>Calibración</h3>
+          <div className="tabla-wrap">
+            <table className="tabla">
+              <thead><tr><th>Fotos</th><th className="r">Contorno irregular</th><th className="r">Zonas rojizas</th></tr></thead>
+              <tbody className="mono">
+                <tr><td>Sanos del dataset (740)</td><td className="r">3 (0,4 %)</td><td className="r">0</td></tr>
+                <tr><td>Deshidratados del dataset (833)</td><td className="r">180</td><td className="r">98</td></tr>
+                <tr><td>Deshidratados, celular (30)</td><td className="r">11</td><td className="r">6</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p style={{ marginTop: 10 }}>
+            La cicatriz anaranjada del pedúnculo y la capa cerosa clara no se cuentan como defectos. Esta revisión no detecta moho,
+            magulladuras sin deformación ni defectos que no se vean en la foto. Para detectarlos de forma confiable habría que fotografiar y
+            etiquetar frutos con esos defectos y entrenar el modelo con más clases.
+          </p>
+        </section>
+
+        <section id="lote">
+          <h2>Lote y criterio de aceptación</h2>
+          <p>
+            En la sección <b>Lote</b> se registran los datos del lote (código, productor, variedad, fecha y responsable) y el criterio con que se
+            acepta o rechaza:
+          </p>
+          <ul className="lista-doc" style={{ marginTop: 10 }}>
+            <li><b>Tolerancia:</b> porcentaje máximo de frutos defectuosos (5 % por defecto). El lote se acepta si no se supera.</li>
+            <li><b>Muestra mínima:</b> número de frutos a partir del cual el dictamen deja de ser provisional (30 por defecto).</li>
+            <li><b>Dudosos:</b> pueden contar como defectuosos (criterio conservador) o excluirse del cálculo.</li>
+            <li><b>Otros defectos:</b> opcionalmente, los frutos marcados en la revisión experimental cuentan como defectuosos.</li>
+          </ul>
+          <p style={{ marginTop: 10 }}>
+            Junto al porcentaje de defectuosos se muestra su intervalo de confianza al 95 % (Wilson). Si el porcentaje está dentro de la
+            tolerancia pero el intervalo la supera, la aplicación sugiere ampliar la muestra. El informe puede imprimirse o guardarse como PDF y
+            los datos se exportan a CSV. Los valores por defecto son ilustrativos: ajústalos al estándar o contrato que se aplique.
+          </p>
+        </section>
+
         <section id="fotos">
           <h2>Toma de fotos</h2>
           <p>El modelo se entrenó con fotos en condiciones controladas. Mientras más se parezca la foto a esas condiciones, más confiable será el resultado.</p>
@@ -296,9 +352,41 @@ export function ComoFunciona({ estadoModelo }: { estadoModelo: EstadoModelo }) {
             <p>El modelo se entrenó con el fondo reemplazado por gris uniforme para que se concentre en la piel del fruto. Si el recorte aparece cortado o con restos de fondo, conviene repetir la foto con mejor luz.</p>
           </details>
           <details className="faq">
+            <summary>Un fruto con arrugas leves sale con 0 %. ¿Por qué?</summary>
+            <p>
+              El porcentaje no es el grado de deshidratación: es la seguridad del modelo de que el fruto pertenece a la clase «deshidratado».
+              El modelo se entrenó solo con dos clases bien diferenciadas (piel lisa y arrugamiento visible), por eso sus probabilidades
+              suelen estar cerca de 0 % o de 100 %. Un arrugamiento leve, que no estaba representado en el entrenamiento, tiende a quedar del lado
+              «sano». Para graduar la severidad habría que etiquetar frutos con deshidratación leve como una clase propia y volver a entrenar.
+            </p>
+          </details>
+          <details className="faq">
             <summary>¿Qué pasa con mis fotos y resultados?</summary>
             <p>Las fotos se procesan en el navegador y no se guardan. El lote se almacena en el propio dispositivo y puede exportarse a CSV o vaciarse en cualquier momento.</p>
           </details>
+        </section>
+
+        <section id="acerca">
+          <h2>Acerca de</h2>
+          <p>
+            Arándano QC es un prototipo de investigación para apoyar la inspección de calidad de arándanos frescos. Detecta la deshidratación
+            (arrugamiento visible) con visión artificial desde el celular, sin enviar las fotos a ningún servidor.
+          </p>
+          <div className="tabla-wrap" style={{ marginTop: 12 }}>
+            <table className="tabla">
+              <tbody>
+                <tr><th>Versión</th><td className="mono">{__VERSION__} · {__FECHA__}</td></tr>
+                <tr><th>Modelo</th><td>YOLOv11n-cls (Ultralytics), 320 × 320 px, exportado a ONNX</td></tr>
+                <tr><th>Ejecución</th><td>ONNX Runtime Web (WebAssembly) en el propio dispositivo</td></tr>
+                <tr><th>Aplicación</th><td>React, TypeScript y Vite; instalable y usable sin conexión (PWA)</td></tr>
+                <tr><th>Datos</th><td>Fotos y lotes se guardan solo en el dispositivo</td></tr>
+                <tr><th>Código</th><td><a href="https://github.com/carlos-d04p/arandano-qc" target="_blank" rel="noreferrer">github.com/carlos-d04p/arandano-qc</a></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="small muted" style={{ marginTop: 10 }}>
+            Herramienta de apoyo: no sustituye la inspección oficial de calidad ni la evaluación de un especialista.
+          </p>
         </section>
       </article>
     </div>

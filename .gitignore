@@ -28,7 +28,6 @@ dist-ssr
 _version_anterior/
 
 .vercel
-.claude/
 
 # Imágenes temporales de calibración
 public/_cal/

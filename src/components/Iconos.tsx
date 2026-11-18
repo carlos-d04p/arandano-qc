@@ -43,6 +43,9 @@ export const Descargar = (p: P) => (
 export const Copiar = (p: P) => (
   <Base {...p}><rect x="8.5" y="8.5" width="12" height="12" rx="2" /><path d="M15.5 8.5V5.5a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3" /></Base>
 )
+export const Imprimir = (p: P) => (
+  <Base {...p}><path d="M7 8V3.5h10V8M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="7" y="13.5" width="10" height="7" rx="1" /></Base>
+)
 export const Flecha = (p: P) => (<Base {...p}><path d="M5 12h14M13 6l6 6-6 6" /></Base>)
 export const Mas = (p: P) => (<Base {...p}><path d="M12 5v14M5 12h14" /></Base>)
 export const Sol = (p: P) => (

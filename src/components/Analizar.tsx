@@ -2,6 +2,8 @@ import { useRef, useState } from 'react'
 import { aDataURL, ErrorFoto, procesarFoto } from '../lib/procesar'
 import { clasificar } from '../lib/modelo'
 import { evaluarCalidad, FotoNoValida, type Aviso } from '../lib/calidad'
+import { DEFECTOS, inspeccionar, type CodigoDefecto } from '../lib/defectos'
+import type { Extra } from '../lib/lote'
 import { pct, promedio, UMBRAL_ALTO, UMBRAL_BAJO, veredicto } from '../lib/veredicto'
 import { Escala } from './Escala'
 import { Alerta, Camara, Galeria, Mas } from './Iconos'
@@ -14,13 +16,14 @@ interface Vista {
   original: string
   p: number
   avisos: Aviso[]
+  defectos: CodigoDefecto[]
 }
 
 interface Props {
   numero: number
   estadoModelo: EstadoModelo
   reintentarModelo: () => void
-  onGuardar: (p: number, vistas: number, miniatura: string) => void
+  onGuardar: (p: number, vistas: number, miniatura: string, extra: Extra) => void
   avisar: (t: string) => void
   irAGuia: () => void
 }
@@ -53,6 +56,7 @@ export function Analizar({ numero, estadoModelo, reintentarModelo, onGuardar, av
   const actual = vistas[Math.min(sel, vistas.length - 1)]
   const lleno = vistas.length >= MAX_VISTAS
   const conAvisos = vistas.filter((x) => x.avisos.length).length
+  const defectos = [...new Set(vistas.flatMap((x) => x.defectos))]
 
   async function analizar(fuentes: Blob[]) {
     setError('')
@@ -65,7 +69,8 @@ export function Analizar({ numero, estadoModelo, reintentarModelo, onGuardar, av
           const r = await procesarFoto(f)
           const avisos = evaluarCalidad(r.medidas)
           const p = await clasificar(r.entrada)
-          setVistas((vs) => [...vs, { entrada: aDataURL(r.entrada), original: r.original, p, avisos }])
+          const defectos = inspeccionar(r.entrada)
+          setVistas((vs) => [...vs, { entrada: aDataURL(r.entrada), original: r.original, p, avisos, defectos }])
           setSel(MAX_VISTAS) // se ajusta a la última vista disponible
         } catch (e) {
           if (e instanceof ErrorFoto || e instanceof FotoNoValida) setError(`No se analizó la foto. ${e.message}`)
@@ -108,7 +113,8 @@ export function Analizar({ numero, estadoModelo, reintentarModelo, onGuardar, av
 
   async function guardar() {
     if (pm == null) return
-    onGuardar(pm, vistas.length, await miniatura(vistas[0].entrada))
+    const avisos = [...new Set(vistas.flatMap((x) => x.avisos.map((a) => a.codigo)))]
+    onGuardar(pm, vistas.length, await miniatura(vistas[0].entrada), { defectos, avisos })
     avisar(`Muestra ${numero} guardada en el lote`)
     reiniciar()
   }
@@ -210,16 +216,27 @@ export function Analizar({ numero, estadoModelo, reintentarModelo, onGuardar, av
               <div className={`veredicto ${v ? v.clase : 'vacio'}`} aria-live="polite">
                 <div className="etq">Veredicto</div>
                 <h3>{v ? v.titulo : 'Pendiente'}</h3>
-                <p>{v ? v.detalle : estadoModelo === 'cargando' ? 'Preparando el modelo…' : 'Toma o sube una foto para evaluar el fruto.'}</p>
+                <p>
+                  {v
+                    ? v.clase === 'ok' && defectos.length
+                      ? 'Sin deshidratación visible, pero hay otros defectos que revisar.'
+                      : v.detalle
+                    : estadoModelo === 'cargando'
+                      ? 'Preparando el modelo…'
+                      : 'Toma o sube una foto para evaluar el fruto.'}
+                </p>
               </div>
 
               <Escala p={pm} />
+              {pm != null && <p className="small muted nota-escala">La probabilidad expresa qué tan seguro está el modelo de que el fruto esté deshidratado; no mide el grado de deshidratación.</p>}
 
               <dl className="datos">
                 <dt>Probabilidad de deshidratación</dt>
                 <dd className="mono">{pm != null ? pct(pm) : '—'}</dd>
                 <dt>Vistas analizadas</dt>
                 <dd className="mono">{vistas.length || '—'}</dd>
+                <dt>Otros defectos <span className="etq-exp">exp.</span></dt>
+                <dd>{!vistas.length ? '—' : defectos.length ? <span className="calidad duda">Revisar</span> : <span className="calidad ok">No detectados</span>}</dd>
                 <dt>Calidad de la foto</dt>
                 <dd>{!vistas.length ? '—' : conAvisos ? <span className="calidad duda">{conAvisos === vistas.length ? 'Con advertencias' : `${conAvisos} de ${vistas.length} con advertencias`}</span> : <span className="calidad ok">Adecuada</span>}</dd>
                 <dt>Criterio</dt>
@@ -233,6 +250,17 @@ export function Analizar({ numero, estadoModelo, reintentarModelo, onGuardar, av
                     <b>Resultado poco confiable{vistas.length > 1 ? ` en la vista ${Math.min(sel, vistas.length - 1) + 1}` : ''}.</b> La foto no cumple las condiciones con que se entrenó el modelo:
                     <ul className="lista-avisos">{actual.avisos.map((a) => <li key={a.codigo}>{a.texto}</li>)}</ul>
                     <div className="nota-acc"><button className="btn sec peq" onClick={repetir} disabled={bloqueado}><Camara size={16} /> Repetir foto</button></div>
+                  </div>
+                </div>
+              )}
+
+              {defectos.length > 0 && (
+                <div className="nota info" style={{ marginTop: 14 }}>
+                  <Alerta size={16} />
+                  <div>
+                    <b>Otros defectos (experimental).</b> El modelo solo evalúa la deshidratación; esta revisión usa la forma y el color del fruto.
+                    Confírmalo a simple vista:
+                    <ul className="lista-avisos">{defectos.map((d) => <li key={d}><b>{DEFECTOS[d].titulo}.</b> {DEFECTOS[d].texto}</li>)}</ul>
                   </div>
                 </div>
               )}

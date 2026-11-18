@@ -5,7 +5,7 @@ import { Lote } from './components/Lote'
 import { Validacion } from './components/Validacion'
 import { Escanear, Info, Lista, Logo, Matriz } from './components/Iconos'
 import { cargarModelo } from './lib/modelo'
-import { useLote } from './lib/lote'
+import { useDatosLote, useLote } from './lib/lote'
 
 export type EstadoModelo = 'cargando' | 'listo' | 'error'
 type Pestana = 'analizar' | 'lote' | 'validacion' | 'guia'
@@ -28,6 +28,7 @@ export default function App() {
   const [toast, setToast] = useState('')
   const timer = useRef<number>(undefined)
   const { lote, siguiente, agregar, quitar, vaciar } = useLote()
+  const { datos, cambiar, nuevoLote } = useDatosLote()
 
   const esperarModelo = useCallback(() => {
     cargarModelo().then(
@@ -114,7 +115,20 @@ export default function App() {
             irAGuia={() => ir('guia')}
           />
         </div>
-        {pestana === 'lote' && <Lote lote={lote} quitar={quitar} vaciar={vaciar} avisar={avisar} irAAnalizar={() => ir('analizar')} />}
+        {pestana === 'lote' && (
+          <Lote
+            lote={lote}
+            datos={datos}
+            cambiar={cambiar}
+            quitar={quitar}
+            nuevoLote={() => {
+              vaciar()
+              nuevoLote()
+            }}
+            avisar={avisar}
+            irAAnalizar={() => ir('analizar')}
+          />
+        )}
         {/* Validación también queda montada para no perder el registro en curso */}
         <div hidden={pestana !== 'validacion'}>
           <Validacion estadoModelo={estadoModelo} avisar={avisar} />

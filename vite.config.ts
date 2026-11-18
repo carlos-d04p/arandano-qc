@@ -1,6 +1,7 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import pkg from './package.json' with { type: 'json' }
 
 export default defineConfig({
   plugins: [
@@ -30,10 +31,15 @@ export default defineConfig({
         // La app, el modelo (6 MB) y el motor WebAssembly (~15 MB, 4 MB comprimido) quedan guardados para usarla sin conexión.
         globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,onnx,wasm,woff2}'],
         maximumFileSizeToCacheInBytes: 30 * 1024 * 1024,
+        globIgnores: ['og.png'],
         navigateFallback: '/index.html',
       },
     }),
   ],
+  define: {
+    __VERSION__: JSON.stringify(pkg.version),
+    __FECHA__: JSON.stringify(new Date().toISOString().slice(0, 10)),
+  },
   worker: { format: 'es' },
   optimizeDeps: { exclude: ['onnxruntime-web'] },
   build: { target: 'es2022', chunkSizeWarningLimit: 1200 },
