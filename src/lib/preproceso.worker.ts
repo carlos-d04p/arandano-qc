@@ -4,6 +4,7 @@ import Nucleo from './nucleo.js'
 
 export type Pedido =
   | { id: number; tipo: 'localizar'; img: ImageData }
+  | { id: number; tipo: 'localizarVarios'; img: ImageData }
   | { id: number; tipo: 'preparar'; img: ImageData; salida: number }
 
 self.onmessage = (ev: MessageEvent<Pedido>) => {
@@ -11,6 +12,8 @@ self.onmessage = (ev: MessageEvent<Pedido>) => {
   try {
     if (p.tipo === 'localizar') {
       self.postMessage({ id: p.id, ok: true, res: Nucleo.localizar(p.img) })
+    } else if (p.tipo === 'localizarVarios') {
+      self.postMessage({ id: p.id, ok: true, res: Nucleo.localizarVarios(p.img) })
     } else {
       const r = Nucleo.preparar(p.img, p.salida)
       if (r) (self as unknown as Worker).postMessage({ id: p.id, ok: true, res: r }, [r.data.buffer])

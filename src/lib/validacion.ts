@@ -156,7 +156,7 @@ export function resumenTexto(regs: Registro[], rechazadas: number, condiciones: 
     `Matriz [[VN ${m.tn}, FP ${m.fp}], [FN ${m.fn}, VP ${m.tp}]]. Dudosos (${Math.round(UMBRAL_BAJO * 100)}–${Math.round(UMBRAL_ALTO * 100)} %): ${m.dudosos}.`
   const buenas = regs.filter((r) => !r.avisos?.length)
   return [
-    `Validación de Arándano QC · ${new Date().toLocaleString('es')}`,
+    `Validación de BerryScan · ${new Date().toLocaleString('es')}`,
     condiciones ? `Condiciones: ${condiciones}` : '',
     linea('Por foto', calcular(regs)),
     linea('Por fruto', calcular(porFruto(regs))),

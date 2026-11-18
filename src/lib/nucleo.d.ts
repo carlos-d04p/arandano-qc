@@ -32,8 +32,29 @@ export interface Preparada {
   }
 }
 
+export interface FrutoLocalizado {
+  /** Centro, ancho y alto relativos a la foto (0–1) */
+  cx: number
+  cy: number
+  ancho: number
+  alto: number
+  /** Área respecto del objeto mayor */
+  area: number
+  /** Toca el borde de la foto (fruto cortado) */
+  borde: boolean
+}
+
+export interface LocalizacionVarios {
+  fondo: number
+  fondoRGB: [number, number, number]
+  frutos: FrutoLocalizado[]
+  /** Objetos oscuros entre 10 % y 20 % del mayor (restos o frutos muy pequeños) que no se analizan */
+  menores: number
+}
+
 declare const Nucleo: {
   localizar(img: Imagen): Localizacion | null
+  localizarVarios(img: Imagen, minRel?: number): LocalizacionVarios | null
   preparar(rec: Imagen, salida?: number): Preparada | null
   LADO: number
 }

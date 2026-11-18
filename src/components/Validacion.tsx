@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { aDataURL, ErrorFoto, miniaturaDe, procesarFoto } from '../lib/procesar'
+import { aDataURL, analizarFoto, ErrorFoto, miniaturaDe } from '../lib/procesar'
 import { clasificar } from '../lib/modelo'
 import { evaluarCalidad, FotoNoValida, type CodigoAviso } from '../lib/calidad'
 import { descargar } from '../lib/lote'
@@ -114,13 +114,36 @@ export function Validacion({ estadoModelo, avisar }: Props) {
     try {
       for (const f of fuentes) {
         try {
-          const r = await procesarFoto(f)
-          const avisos = evaluarCalidad(r.medidas)
-          const p = await clasificar(r.entrada)
-          const reg = val.agregar({ fruto, vista, real, p, fecha: new Date().toISOString(), miniatura: miniaturaDe(r.entrada), avisos: avisos.map((a) => a.codigo) })
-          nuevos.push({ ...reg, entrada: aDataURL(r.entrada) })
-          if (frutoVista == null) fruto++
-          else vista++
+          const res = await analizarFoto(f)
+          if (res.varios && frutoVista != null) {
+            setError(`La foto tiene ${res.frutos.length} frutos; una vista adicional debe mostrar solo a ${idFruto(frutoVista)}.`)
+            continue
+          }
+          // con varios frutos en la foto, cada uno se registra como un fruto distinto de la clase elegida
+          const items = res.varios ? res.frutos : [res.foto]
+          for (const r of items) {
+            if ('error' in r) {
+              val.sumarRechazo()
+              continue
+            }
+            let avisos
+            try {
+              avisos = evaluarCalidad(r.medidas, { varios: res.varios })
+            } catch (e) {
+              if (!res.varios) throw e
+              val.sumarRechazo()
+              continue
+            }
+            const p = await clasificar(r.entrada)
+            const reg = val.agregar({ fruto, vista, real, p, fecha: new Date().toISOString(), miniatura: miniaturaDe(r.entrada), avisos: avisos.map((a) => a.codigo) })
+            nuevos.push({ ...reg, entrada: aDataURL(r.entrada) })
+            if (frutoVista == null) fruto++
+            else vista++
+          }
+          if (res.varios) {
+            const fallidos = res.frutos.filter((x) => 'error' in x).length
+            if (fallidos) setError(`${fallidos} fruto(s) de la foto no se pudieron analizar (cortados por el borde o pegados) y se contaron como rechazados.`)
+          }
         } catch (e) {
           if (e instanceof ErrorFoto || e instanceof FotoNoValida) {
             val.sumarRechazo()
@@ -230,7 +253,7 @@ export function Validacion({ estadoModelo, avisar }: Props) {
                       <button className="btn sec" onClick={() => galeria.current?.click()} disabled={bloqueado}><Galeria size={18} /> Subir {frutoVista == null ? 'imágenes' : 'imagen'}</button>
                     </div>
                     <p className="small muted" style={{ marginTop: 8 }}>
-                      {!real ? 'Elige primero la clase real; queda fijada antes de ver la predicción.' : frutoVista == null ? 'Puedes subir varias imágenes a la vez: cada una cuenta como un fruto distinto de la clase elegida.' : 'Se agregará como otra vista del mismo fruto.'}
+                      {!real ? 'Elige primero la clase real; queda fijada antes de ver la predicción.' : frutoVista == null ? 'Puedes subir varias imágenes o una foto con varios frutos separados: cada fruto cuenta por separado con la clase elegida.' : 'Se agregará como otra vista del mismo fruto.'}
                     </p>
                     {frutoVista != null && (
                       <button className="enlace small" style={{ marginTop: 6 }} onClick={siguienteFruto}>Cancelar y pasar a un fruto nuevo</button>

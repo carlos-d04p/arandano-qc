@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { aDataURL, procesarFoto } from '../lib/procesar'
 import { clasificar } from '../lib/modelo'
 import { pct, UMBRAL_ALTO, UMBRAL_BAJO, veredicto } from '../lib/veredicto'
@@ -17,6 +17,7 @@ const SECCIONES = [
   ['decision', 'Regla de decisión'],
   ['calidad', 'Control de calidad de la foto'],
   ['defectos', 'Otros defectos (experimental)'],
+  ['varios', 'Varios frutos por foto'],
   ['lote', 'Lote y criterio de aceptación'],
   ['fotos', 'Toma de fotos'],
   ['modelo', 'Modelo y resultados'],
@@ -88,6 +89,35 @@ export function ComoFunciona({ estadoModelo }: { estadoModelo: EstadoModelo }) {
   const bajo = Math.round(UMBRAL_BAJO * 100)
   const alto = Math.round(UMBRAL_ALTO * 100)
 
+  const [activa, setActiva] = useState<string>(SECCIONES[0][0])
+
+  // resalta en el índice la sección que se está leyendo
+  useEffect(() => {
+    let cuadro = 0
+    const medir = () => {
+      cuadro = 0
+      let actual: string = SECCIONES[0][0]
+      for (const [id] of SECCIONES) {
+        const el = document.getElementById(id)
+        if (el && el.getBoundingClientRect().top <= 140) actual = id
+      }
+      // al llegar al final de la página, la última sección
+      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) actual = SECCIONES[SECCIONES.length - 1][0]
+      setActiva(actual)
+    }
+    const alDesplazar = () => {
+      if (!cuadro) cuadro = requestAnimationFrame(medir)
+    }
+    medir()
+    window.addEventListener('scroll', alDesplazar, { passive: true })
+    window.addEventListener('resize', alDesplazar)
+    return () => {
+      window.removeEventListener('scroll', alDesplazar)
+      window.removeEventListener('resize', alDesplazar)
+      cancelAnimationFrame(cuadro)
+    }
+  }, [])
+
   const ir = (e: React.MouseEvent, id: string) => {
     e.preventDefault()
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -99,7 +129,7 @@ export function ComoFunciona({ estadoModelo }: { estadoModelo: EstadoModelo }) {
         <p>En esta página</p>
         <ol>
           {SECCIONES.map(([id, t]) => (
-            <li key={id}><a href={`#${id}`} onClick={(e) => ir(e, id)}>{t}</a></li>
+            <li key={id}><a href={`#${id}`} onClick={(e) => ir(e, id)} aria-current={activa === id ? 'true' : undefined}>{t}</a></li>
           ))}
         </ol>
       </nav>
@@ -108,7 +138,7 @@ export function ComoFunciona({ estadoModelo }: { estadoModelo: EstadoModelo }) {
         <section id="resumen">
           <h1>Cómo funciona</h1>
           <p className="bajada">
-            Arándano QC estima, a partir de una fotografía, la probabilidad de que un arándano esté deshidratado,
+            BerryScan estima, a partir de una fotografía, la probabilidad de que un arándano esté deshidratado,
             es decir, que presente arrugamiento visible de la piel (<i>shriveling</i>), defecto definido visualmente en los
             estándares de calidad del USDA para arándanos.
           </p>
@@ -143,9 +173,13 @@ export function ComoFunciona({ estadoModelo }: { estadoModelo: EstadoModelo }) {
                 <tr><td className="mono">&lt; {bajo} %</td><td><span className="calidad ok">Cumple</span></td><td>Fruto aceptado</td></tr>
                 <tr><td className="mono">{bajo} – {alto} %</td><td><span className="calidad duda">Dudoso</span></td><td>Agregar otra vista o revisar manualmente</td></tr>
                 <tr><td className="mono">≥ {alto} %</td><td><span className="calidad mal">No cumple</span></td><td>Fruto rechazado</td></tr>
+                <tr><td>&lt; {bajo} % con otros defectos</td><td><span className="calidad duda">Revisar</span></td><td>Confirmar a simple vista</td></tr>
               </tbody>
             </table>
           </div>
+          <p style={{ marginTop: 10 }}>
+            El porcentaje es la seguridad del modelo de que el fruto pertenece a la clase «deshidratado», no el grado de deshidratación.
+          </p>
         </section>
 
         <section id="calidad">
@@ -154,12 +188,12 @@ export function ComoFunciona({ estadoModelo }: { estadoModelo: EstadoModelo }) {
             Antes de confiar en la predicción, la aplicación revisa que la foto se parezca a las del entrenamiento. Los umbrales se
             calibraron con 180 fotos válidas del conjunto de datos, las fotos que se excluyeron por movimiento y degradaciones simuladas.
           </p>
+          <p>Si la foto tiene varios frutos, cada uno se analiza por separado (ver <i>Varios frutos por foto</i>).</p>
           <h3>La foto no se analiza si…</h3>
           <div className="tabla-wrap">
             <table className="tabla">
               <thead><tr><th>Problema</th><th>Criterio</th></tr></thead>
               <tbody>
-                <tr><td>Hay más de un fruto u objeto oscuro</td><td>Segundo objeto con un área ≥ 40 % de la del fruto</td></tr>
                 <tr><td>La forma es demasiado alargada</td><td>Relación ancho/alto &lt; 0,5 (en el dataset, mínimo 0,58)</td></tr>
                 <tr><td>La forma es irregular</td><td>Área / envolvente convexa &lt; 0,55 (en el dataset, mínimo 0,68)</td></tr>
               </tbody>
@@ -175,7 +209,7 @@ export function ComoFunciona({ estadoModelo }: { estadoModelo: EstadoModelo }) {
                 <tr><td>Foto oscura o sobreexpuesta</td><td>Gris mediano de la foto fuera del rango 70–225</td></tr>
                 <tr><td>Fondo con manchas o textura</td><td>Desviación estándar del gris del fondo &gt; 28</td></tr>
                 <tr><td>Color poco habitual</td><td>Saturación del color del fruto &gt; 0,70</td></tr>
-                <tr><td>Objeto oscuro cercano</td><td>Segundo objeto entre el 25 % y el 40 % del área del fruto</td></tr>
+                <tr><td>Objeto oscuro cercano</td><td>Segundo objeto entre el 25 % y el 40 % del área del fruto (solo con un fruto por foto)</td></tr>
               </tbody>
             </table>
           </div>
@@ -189,8 +223,9 @@ export function ComoFunciona({ estadoModelo }: { estadoModelo: EstadoModelo }) {
           <h2>Otros defectos (experimental)</h2>
           <p>
             El modelo solo fue entrenado para distinguir frutos sanos de deshidratados. Para no pasar por alto otros problemas, la aplicación
-            hace además una revisión de la forma y el color del fruto, sin inteligencia artificial, y marca «Revisar» cuando encuentra algo fuera
-            de lo habitual. No cambia el veredicto de deshidratación: es un aviso para confirmar a simple vista.
+            hace además una revisión de la forma y el color del fruto, sin inteligencia artificial. Si encuentra algo fuera de lo habitual en un fruto
+            que el modelo da por sano, el veredicto pasa de «Cumple» a «Revisar», para confirmarlo a simple vista. En el lote, esos frutos cuentan
+            como dudosos.
           </p>
           <div className="tabla-wrap" style={{ marginTop: 12 }}>
             <table className="tabla">
@@ -198,24 +233,48 @@ export function ComoFunciona({ estadoModelo }: { estadoModelo: EstadoModelo }) {
               <tbody>
                 <tr><td>Contorno irregular</td><td>Abolladura, deformación, arrugas profundas o pedicelo adherido</td><td>Área / envolvente convexa del contorno &lt; 0,978</td></tr>
                 <tr><td>Zonas rojizas</td><td>Herida, rajadura, pulpa expuesta o jugo (exudado)</td><td>Más del 0,5 % de la piel con tono rojo-morado</td></tr>
+                <tr><td>Grieta o rajadura</td><td>Partidura, rajadura o daño mecánico</td><td>Zona café-anaranjada alargada de más del 32 % del diámetro</td></tr>
+                <tr><td>Mancha café</td><td>Herida seca, pudrición, golpe o quemadura de sol</td><td>Más del 4 % de la piel café-anaranjada</td></tr>
               </tbody>
             </table>
           </div>
           <h3>Calibración</h3>
           <div className="tabla-wrap">
             <table className="tabla">
-              <thead><tr><th>Fotos</th><th className="r">Contorno irregular</th><th className="r">Zonas rojizas</th></tr></thead>
+              <thead><tr><th>Fotos</th><th className="r">Contorno</th><th className="r">Rojizas</th><th className="r">Grieta</th><th className="r">Mancha</th></tr></thead>
               <tbody className="mono">
-                <tr><td>Sanos del dataset (740)</td><td className="r">3 (0,4 %)</td><td className="r">0</td></tr>
-                <tr><td>Deshidratados del dataset (833)</td><td className="r">180</td><td className="r">98</td></tr>
-                <tr><td>Deshidratados, celular (30)</td><td className="r">11</td><td className="r">6</td></tr>
+                <tr><td>Sanos del dataset (740)</td><td className="r">3</td><td className="r">0</td><td className="r">0</td><td className="r">2</td></tr>
+                <tr><td>Deshidratados del dataset (833)</td><td className="r">180</td><td className="r">98</td><td className="r">1</td><td className="r">3</td></tr>
+                <tr><td>Deshidratados, celular (30)</td><td className="r">11</td><td className="r">6</td><td className="r">—</td><td className="r">—</td></tr>
               </tbody>
             </table>
           </div>
           <p style={{ marginTop: 10 }}>
-            La cicatriz anaranjada del pedúnculo y la capa cerosa clara no se cuentan como defectos. Esta revisión no detecta moho,
+            Los «sanos» del dataset se etiquetaron solo por deshidratación, y algunos tienen heridas reales: los dos marcados con mancha café las
+            tienen. La cicatriz del pedúnculo, el cáliz de la corona y la capa cerosa clara no cuentan como defectos; por eso las grietas cortas que
+            nacen de la cicatriz pueden pasar inadvertidas. Esta revisión no detecta moho,
             magulladuras sin deformación ni defectos que no se vean en la foto. Para detectarlos de forma confiable habría que fotografiar y
             etiquetar frutos con esos defectos y entrenar el modelo con más clases.
+          </p>
+        </section>
+
+        <section id="varios">
+          <h2>Varios frutos por foto</h2>
+          <p>
+            Si la foto tiene varios arándanos, la aplicación los separa y evalúa cada uno por separado, con el mismo preprocesamiento que una foto
+            individual: recorta cada fruto, tapa a los vecinos con el color del fondo y lo lleva a 320 × 320 px. En la foto se numera cada fruto con
+            un recuadro del color de su resultado, y todos pueden guardarse en el lote de una vez. Subir varias imágenes a la vez también las trata
+            como frutos distintos: nunca se promedian como vistas del mismo fruto.
+          </p>
+          <ul className="lista-doc" style={{ marginTop: 10 }}>
+            <li>Los frutos deben estar separados entre sí. Si dos se tocan, se detectan como un solo objeto de forma irregular y no se analizan.</li>
+            <li>Un fruto cortado por el borde de la foto no se analiza.</li>
+            <li>Cada fruto debe medir al menos unos 220 px en la foto: con un celular de 12 MP caben cómodamente 10 a 15 frutos.</li>
+            <li>Cada fruto se ve desde un solo ángulo; para confirmar un dudoso, fotografíalo solo y agrega otra vista.</li>
+          </ul>
+          <p style={{ marginTop: 10 }}>
+            En una prueba con 12 frutos del conjunto de prueba (6 sanos y 6 deshidratados) reunidos en una sola imagen, los 12 se detectaron y cada uno
+            obtuvo el mismo resultado que analizado por separado. Conviene confirmarlo con fotos reales en la sección Validación, que también acepta fotos con varios frutos.
           </p>
         </section>
 
@@ -369,7 +428,7 @@ export function ComoFunciona({ estadoModelo }: { estadoModelo: EstadoModelo }) {
         <section id="acerca">
           <h2>Acerca de</h2>
           <p>
-            Arándano QC es un prototipo de investigación para apoyar la inspección de calidad de arándanos frescos. Detecta la deshidratación
+            BerryScan es un prototipo de investigación para apoyar la inspección de calidad de arándanos frescos. Detecta la deshidratación
             (arrugamiento visible) con visión artificial desde el celular, sin enviar las fotos a ningún servidor.
           </p>
           <div className="tabla-wrap" style={{ marginTop: 12 }}>

@@ -25,3 +25,14 @@ export const pct = (p: number) => `${Math.round(p * 100)} %`
 export function promedio(ps: number[]): number | null {
   return ps.length ? ps.reduce((a, b) => a + b, 0) / ps.length : null
 }
+
+/**
+ * Veredicto final del fruto: el del modelo (deshidratación), salvo que la inspección complementaria haya
+ * encontrado otros defectos en un fruto que el modelo da por sano; entonces pasa a «Revisar».
+ */
+export function veredictoFinal(p: number | null, otrosDefectos: readonly string[] = []): Veredicto | null {
+  const v = veredicto(p)
+  if (v?.clase === 'ok' && otrosDefectos.length)
+    return { clase: 'duda', titulo: 'Revisar', corto: 'Revisar', detalle: 'Sin deshidratación visible, pero con otros defectos: revísalo a mano.' }
+  return v
+}

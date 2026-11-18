@@ -35,10 +35,16 @@ export const UMBRALES = {
 
 export class FotoNoValida extends Error {}
 
-/** Lanza FotoNoValida si la foto no debe clasificarse; si no, devuelve las advertencias. */
-export function evaluarCalidad(m: Medidas): Aviso[] {
+/**
+ * Lanza FotoNoValida si la foto no debe clasificarse; si no, devuelve las advertencias.
+ * Con varios = true (un fruto dentro de una foto con varios) no se aplican los criterios que dependen
+ * de que haya un solo fruto: tamaño relativo a la foto, objetos cercanos y uniformidad del fondo.
+ */
+export function evaluarCalidad(m: Medidas, { varios = false } = {}): Aviso[] {
   const U = UMBRALES
-  if (m.segundo >= U.segundoBloqueo)
+  if (varios && (m.aspecto < U.aspectoMin || m.solidez < U.solidezMin))
+    throw new FotoNoValida('Parecen dos frutos juntos o una forma irregular. Sepáralos un poco y repite la foto.')
+  if (!varios && m.segundo >= U.segundoBloqueo)
     throw new FotoNoValida('Hay más de un fruto u objeto oscuro en la foto. Deja solo un arándano sobre la cartulina.')
   if (m.aspecto < U.aspectoMin)
     throw new FotoNoValida('El objeto detectado es demasiado alargado para ser un arándano. Revisa que no haya sombras u objetos junto al fruto.')
@@ -48,18 +54,23 @@ export function evaluarCalidad(m: Medidas): Aviso[] {
   const avisos: Aviso[] = []
   if (m.bordeNitidez < U.bordeMin)
     avisos.push({ codigo: 'desenfoque', texto: 'La foto parece desenfocada o movida. Mantén el celular quieto y espera a que enfoque.' })
-  if (m.tamRelativo < U.tamRelMin || m.tamPx < U.tamPxMin)
-    avisos.push({ codigo: 'pequeno', texto: 'El fruto se ve muy pequeño. Acércate hasta que ocupe entre 1/5 y 1/3 del ancho de la foto.' })
+  if ((!varios && m.tamRelativo < U.tamRelMin) || m.tamPx < U.tamPxMin)
+    avisos.push({
+      codigo: 'pequeno',
+      texto: varios
+        ? 'El fruto se ve muy pequeño. Acércate o pon menos frutos en la foto.'
+        : 'El fruto se ve muy pequeño. Acércate hasta que ocupe entre 1/5 y 1/3 del ancho de la foto.',
+    })
   if (m.fondo < U.fondoMin)
     avisos.push({ codigo: 'oscura', texto: 'La foto está oscura. Busca más luz, sin usar flash.' })
   if (m.fondo > U.fondoMax)
     avisos.push({ codigo: 'sobreexpuesta', texto: 'La foto está sobreexpuesta o el fondo es demasiado claro. Usa una cartulina gris y evita la luz directa.' })
-  if (m.fondoDE > U.fondoDEMax)
+  if (!varios && m.fondoDE > U.fondoDEMax)
     avisos.push({ codigo: 'fondo', texto: 'El fondo tiene manchas, textura u otros objetos. Usa una cartulina gris lisa y limpia.' })
   const mx = Math.max(...m.color)
   if (mx > 0 && (mx - Math.min(...m.color)) / mx > U.saturacionMax)
     avisos.push({ codigo: 'color', texto: 'El color del objeto es poco habitual para un arándano.' })
-  if (m.segundo >= U.segundoAviso)
+  if (!varios && m.segundo >= U.segundoAviso)
     avisos.push({ codigo: 'objeto_cercano', texto: 'Hay otra mancha u objeto oscuro cerca del fruto (por ejemplo, una sombra).' })
   return avisos
 }

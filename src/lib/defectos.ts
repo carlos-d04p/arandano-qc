@@ -3,8 +3,10 @@
 // Calibración (17-nov-2026): 1573 fotos del dataset y 30 fotos de celular de frutos deshidratados.
 //  · Contorno irregular: 3 de 740 sanos (0,4 %), 180 de 833 deshidratados, 11 de 30 fotos de celular.
 //  · Zonas rojizas: 0 de 740 sanos (máximo 0,14 %), 98 de 833 deshidratados, 6 de 30 fotos de celular.
+//  · Grieta: 0 de 740 sanos (máximo 0,30, cáliz de la corona ≤ 0,26), 1 de 833 deshidratados.
+//  · Mancha café: 2 de 740 sanos (ambos con heridas visibles), 3 de 833 deshidratados.
 
-export type CodigoDefecto = 'contorno' | 'exudado'
+export type CodigoDefecto = 'contorno' | 'exudado' | 'grieta' | 'mancha'
 
 export interface Defecto {
   codigo: CodigoDefecto
@@ -17,6 +19,10 @@ export interface RasgosDefecto {
   solidez: number
   /** Fracción del fruto con tonos rojo-morados (pulpa expuesta o jugo) */
   rojizo: number
+  /** Longitud de la mayor zona café-anaranjada respecto del diámetro del fruto */
+  grieta: number
+  /** Fracción del fruto con tono café-anaranjado */
+  cafe: number
 }
 
 export const UMBRALES_DEFECTO = {
@@ -24,6 +30,10 @@ export const UMBRALES_DEFECTO = {
   solidezMin: 0.978,
   /** Sanos del dataset: máximo 0,0014; la cicatriz anaranjada del pedúnculo no cuenta */
   rojizoMax: 0.005,
+  /** Zona café-anaranjada alargada más larga que el 32 % del diámetro (cáliz y cicatriz: ≤ 0,30) */
+  grietaMax: 0.32,
+  /** Más del 4 % de la piel café-anaranjada (sanos: p99 = 2,5 %) */
+  cafeMax: 0.04,
 }
 
 export const DEFECTOS: Record<CodigoDefecto, Omit<Defecto, 'codigo'>> = {
@@ -34,6 +44,14 @@ export const DEFECTOS: Record<CodigoDefecto, Omit<Defecto, 'codigo'>> = {
   exudado: {
     titulo: 'Zonas rojizas',
     texto: 'Hay zonas rojo-moradas en la piel: posible herida, rajadura, pulpa expuesta o jugo (exudado).',
+  },
+  grieta: {
+    titulo: 'Grieta o rajadura',
+    texto: 'Hay una línea café que se extiende por la piel: posible rajadura, partidura o daño mecánico.',
+  },
+  mancha: {
+    titulo: 'Mancha café',
+    texto: 'Una parte grande de la piel es café: posible herida seca, pudrición, golpe o quemadura de sol.',
   },
 }
 
@@ -153,7 +171,61 @@ export function medirDefectos(img: ImageData): RasgosDefecto | null {
     // rojo-morado (pulpa, jugo); excluye el anaranjado de la cicatriz del pedúnculo (g > b)
     if (r > 60 && r > g + 30 && r > b + 15 && b >= g - 5) rojo++
   }
-  return { solidez, rojizo: k ? rojo / k : 0 }
+  return { solidez, rojizo: k ? rojo / k : 0, ...medirCafe(d, w, h, erosionar(m, w, h, 3), n) }
+}
+
+/**
+ * Grietas o rajaduras: zonas café-anaranjadas (pulpa expuesta y seca) con forma de línea larga.
+ * La cicatriz del pedúnculo tiene el mismo color pero es compacta, por eso se mide la longitud
+ * de cada zona (eje mayor) respecto del diámetro del fruto.
+ */
+function medirCafe(d: Uint8ClampedArray, w: number, h: number, interior: Uint8Array, areaFruto: number): { grieta: number; cafe: number } {
+  const N = w * h
+  const tan = new Uint8Array(N)
+  let nI = 0, nT = 0
+  for (let i = 0; i < N; i++) {
+    if (!interior[i]) continue
+    nI++
+    const r = d[4 * i], g = d[4 * i + 1], b = d[4 * i + 2]
+    if (r >= 70 && r - b >= 25 && g - b >= 8) {
+      tan[i] = 1
+      nT++
+    }
+  }
+  const diam = 2 * Math.sqrt(areaFruto / Math.PI)
+  const visto = new Uint8Array(N)
+  let mejor = 0
+  for (let s = 0; s < N; s++) {
+    if (!tan[s] || visto[s]) continue
+    const pila = [s]
+    visto[s] = 1
+    let n = 0, sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0
+    while (pila.length) {
+      const p = pila.pop()!
+      const x = p % w, y = (p / w) | 0
+      n++
+      sx += x; sy += y; sxx += x * x; syy += y * y; sxy += x * y
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++) {
+          const xx = x + dx, yy = y + dy
+          if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue
+          const q = yy * w + xx
+          if (tan[q] && !visto[q]) {
+            visto[q] = 1
+            pila.push(q)
+          }
+        }
+    }
+    if (n < 6) continue
+    const mx = sx / n, my = sy / n
+    const vxx = sxx / n - mx * mx, vyy = syy / n - my * my, vxy = sxy / n - mx * my
+    const tr = vxx + vyy, det = vxx * vyy - vxy * vxy
+    const lmax = tr / 2 + Math.sqrt(Math.max(0, (tr * tr) / 4 - det))
+    // una línea de longitud L tiene varianza L²/12 a lo largo de su eje
+    const largo = Math.sqrt(12 * lmax)
+    mejor = Math.max(mejor, largo / diam)
+  }
+  return { grieta: mejor, cafe: nI ? nT / nI : 0 }
 }
 
 export function evaluarDefectos(r: RasgosDefecto | null): Defecto[] {
@@ -161,6 +233,8 @@ export function evaluarDefectos(r: RasgosDefecto | null): Defecto[] {
   const out: Defecto[] = []
   if (r.solidez < UMBRALES_DEFECTO.solidezMin) out.push({ codigo: 'contorno', ...DEFECTOS.contorno })
   if (r.rojizo > UMBRALES_DEFECTO.rojizoMax) out.push({ codigo: 'exudado', ...DEFECTOS.exudado })
+  if (r.grieta > UMBRALES_DEFECTO.grietaMax) out.push({ codigo: 'grieta', ...DEFECTOS.grieta })
+  if (r.cafe > UMBRALES_DEFECTO.cafeMax) out.push({ codigo: 'mancha', ...DEFECTOS.mancha })
   return out
 }
 

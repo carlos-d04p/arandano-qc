@@ -78,9 +78,7 @@ export default function App() {
         <div className="topbar-in">
           <div className="marca">
             <Logo />
-            <span className="marca-nombre">Arándano QC</span>
-            <span className="marca-sep" />
-            <span className="marca-sub">Control de calidad</span>
+            <span className="marca-nombre">BerryScan</span>
           </div>
           <nav className="tabs-top" aria-label="Secciones">
             {PESTANAS.map(({ id, titulo }) => (

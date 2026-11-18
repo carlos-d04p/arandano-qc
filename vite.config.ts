@@ -10,8 +10,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon-180x180.png', 'logo.svg'],
       manifest: {
-        name: 'Arándano QC · Control de calidad',
-        short_name: 'Arándano QC',
+        name: 'BerryScan · Control de calidad de arándanos',
+        short_name: 'BerryScan',
         description: 'Detecta arándanos deshidratados (arrugamiento) con visión artificial, directamente en el celular.',
         lang: 'es',
         theme_color: '#ffffff',

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { aCSV, descargar, dictamen, esDefectuoso, nombresDefectos, resumen, type DatosLote, type Dictamen, type FrutoGuardado } from '../lib/lote'
 import { fmt } from '../lib/validacion'
-import { pct, veredicto } from '../lib/veredicto'
+import { pct, veredictoFinal } from '../lib/veredicto'
 import { Basura, Copiar, Descargar, Imprimir, Logo } from './Iconos'
 
 interface Props {
@@ -53,7 +53,7 @@ export function Lote({ lote, datos, cambiar, quitar, nuevoLote, avisar, irAAnali
       `${TITULO[dc.estado]}. ${textoDictamen(dc, datos, r.total)}`,
       `Muestras: ${r.total} · Cumplen: ${r.ok} · Dudosas: ${r.duda} · No cumplen: ${r.mal} · Con otros defectos: ${r.otros}`,
       '',
-      ...lote.map((f) => `${id(f.n)}\t${f.vistas} vista(s)\t${pct(f.p)}\t${veredicto(f.p)!.corto}${f.defectos?.length ? `\t${nombresDefectos(f.defectos)}` : ''}`),
+      ...lote.map((f) => `${id(f.n)}\t${f.vistas} vista(s)\t${pct(f.p)}\t${veredictoFinal(f.p, f.defectos)!.corto}${f.defectos?.length ? `\t${nombresDefectos(f.defectos)}` : ''}`),
     ].filter((l, i) => l || i > 2)
     try {
       await navigator.clipboard.writeText(txt.join('\n'))
@@ -104,7 +104,7 @@ export function Lote({ lote, datos, cambiar, quitar, nuevoLote, avisar, irAAnali
           <div className="cifras">
             <div className="cifra"><span>Muestras</span><b>{r.total}</b></div>
             <div className="cifra ok"><span>Cumplen</span><b>{r.ok}</b></div>
-            <div className="cifra duda"><span>Dudosas</span><b>{r.duda}</b></div>
+            <div className="cifra duda"><span>Dudosas o a revisar</span><b>{r.duda}</b></div>
             <div className="cifra mal"><span>No cumplen</span><b>{r.mal}</b></div>
           </div>
           <div className="distribucion">
@@ -115,7 +115,7 @@ export function Lote({ lote, datos, cambiar, quitar, nuevoLote, avisar, irAAnali
             </div>
             <div className="leyenda">
               <span className="calidad ok">Cumple</span>
-              <span className="calidad duda">Dudoso</span>
+              <span className="calidad duda">Dudoso / revisar</span>
               <span className="calidad mal">No cumple</span>
               <span className="small muted" style={{ marginLeft: 'auto' }}>Con otros defectos: <span className="mono">{r.otros}</span></span>
             </div>
@@ -152,7 +152,7 @@ export function Lote({ lote, datos, cambiar, quitar, nuevoLote, avisar, irAAnali
                   onChange={(e) => cambiar('minimo', Math.min(1000, Math.max(1, Math.round(Number(e.target.value) || 1))))} />
               </label>
               <label className="campo-form ancho">
-                <span>Resultados dudosos</span>
+                <span>Resultados dudosos o a revisar</span>
                 <select className="entrada" value={datos.dudosos} onChange={(e) => cambiar('dudosos', e.target.value as DatosLote['dudosos'])}>
                   <option value="defectuoso">Cuentan como defectuosos (criterio conservador)</option>
                   <option value="excluir">Se excluyen del cálculo</option>
@@ -191,7 +191,7 @@ export function Lote({ lote, datos, cambiar, quitar, nuevoLote, avisar, irAAnali
               </thead>
               <tbody>
                 {lote.slice().reverse().map((f) => {
-                  const v = veredicto(f.p)!
+                  const v = veredictoFinal(f.p, f.defectos)!
                   return (
                     <tr key={f.n}>
                       <td><img src={f.miniatura} alt="" /></td>
@@ -280,7 +280,7 @@ function Informe({ lote, datos, dc, r }: { lote: FrutoGuardado[]; datos: DatosLo
               <td>{hora(f.fecha)}</td>
               <td className="r">{f.vistas}</td>
               <td className="r">{pct(f.p)}</td>
-              <td>{veredicto(f.p)!.corto}</td>
+              <td>{veredictoFinal(f.p, f.defectos)!.corto}</td>
               <td>{nombresDefectos(f.defectos) || '—'}</td>
               <td>{f.avisos?.length ? 'Con advertencias' : 'Adecuada'}</td>
               <td>{esDefectuoso(f, datos) ? 'Sí' : 'No'}</td>
@@ -290,7 +290,7 @@ function Informe({ lote, datos, dc, r }: { lote: FrutoGuardado[]; datos: DatosLo
       </table>
 
       <footer className="inf-pie">
-        Arándano QC · YOLOv11n-cls ejecutado en el dispositivo. Criterio de deshidratación: P &lt; 35 % cumple, 35–65 % dudoso, ≥ 65 % no cumple.
+        BerryScan · YOLOv11n-cls ejecutado en el dispositivo. Criterio de deshidratación: P &lt; 35 % cumple, 35–65 % dudoso, ≥ 65 % no cumple.
         La inspección de otros defectos es experimental. Herramienta de apoyo que no sustituye la inspección oficial de calidad.
       </footer>
     </section>

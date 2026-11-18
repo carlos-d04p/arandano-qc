@@ -117,6 +117,47 @@ const Nucleo = (() => {
     return { cx: c.cx / w, cy: c.cy / h, ancho: (c.x1 - c.x0 + 1) / w, alto: (c.y1 - c.y0 + 1) / h, fondo, segundo: c.segundo / c.n };
   }
 
+  // Paso A para fotos con varios frutos: todas las regiones oscuras de tamaño parecido al mayor.
+  // minRel: área mínima respecto de la mayor para considerarla un fruto.
+  function localizarVarios(img, minRel = 0.2) {
+    const { data, width: w, height: h } = img, n = w * h;
+    const g = gris(data, n);
+    // con muchos frutos la mediana de toda la foto se oscurece: se recalcula el fondo sin los objetos oscuros
+    let fondo = mediana(g), m = null;
+    for (let pasada = 0; pasada < 2; pasada++) {
+      m = new Uint8Array(n);
+      for (let i = 0; i < n; i++) m[i] = g[i] < 0.45 * fondo ? 1 : 0;
+      if (pasada === 0) { const libres = []; for (let i = 0; i < n; i++) if (!m[i]) libres.push(g[i]); if (libres.length) fondo = mediana(libres); }
+    }
+    m = morf(morf(m, w, h, 1, true), w, h, 1, false);
+    const lab = new Int32Array(n), cola = new Int32Array(n), lista = [];
+    let id = 0;
+    for (let s = 0; s < n; s++) {
+      if (!m[s] || lab[s]) continue;
+      id++; let ini = 0, fin = 0; cola[fin++] = s; lab[s] = id;
+      let k = 0, sx = 0, sy = 0, x0 = w, y0 = h, x1 = 0, y1 = 0;
+      while (ini < fin) {
+        const p = cola[ini++], x = p % w, y = (p / w) | 0;
+        k++; sx += x; sy += y; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+        const vec = [x > 0 ? p - 1 : -1, x < w - 1 ? p + 1 : -1, y > 0 ? p - w : -1, y < h - 1 ? p + w : -1];
+        for (const q of vec) if (q >= 0 && m[q] && !lab[q]) { lab[q] = id; cola[fin++] = q; }
+      }
+      if (k >= 30) lista.push({ n: k, cx: sx / k, cy: sy / k, x0, y0, x1, y1 });
+    }
+    if (!lista.length) return null;
+    lista.sort((a, b) => b.n - a.n);
+    const mayor = lista[0].n;
+    // color del fondo (mediana por canal de lo que no es objeto oscuro), para tapar frutos vecinos
+    const libres = [];
+    for (let i = 0; i < n; i += 3) if (!m[i]) libres.push(i);
+    const fondoRGB = [0, 1, 2].map(c => mediana(libres.map(i => data[4 * i + c])));
+    const frutos = lista.filter(c => c.n >= minRel * mayor).map(c => ({
+      cx: c.cx / w, cy: c.cy / h, ancho: (c.x1 - c.x0 + 1) / w, alto: (c.y1 - c.y0 + 1) / h, area: c.n / mayor,
+      borde: c.x0 <= 1 || c.y0 <= 1 || c.x1 >= w - 2 || c.y1 >= h - 2,
+    }));
+    return { fondo, fondoRGB, frutos, menores: lista.filter(c => c.n < minRel * mayor && c.n >= 0.1 * mayor).length };
+  }
+
   // Pasos B-D: sobre el recorte 1000x1000 (como armar_dataset.py + segmentar.py)
   function preparar(rec, salida = 320) {
     const { data, width: w, height: h } = rec, n = w * h;
@@ -236,6 +277,6 @@ const Nucleo = (() => {
       anisotropia: Math.max(ex, ey) ? Math.min(ex, ey) / Math.max(ex, ey) : 1,
     };
   }
-  return { localizar, preparar, LADO };
+  return { localizar, localizarVarios, preparar, LADO };
 })();
 export default Nucleo;

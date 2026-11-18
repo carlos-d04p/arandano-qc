@@ -1,6 +1,6 @@
 // Registro del lote evaluado. Se guarda en el propio dispositivo (localStorage), nunca en un servidor.
 import { useCallback, useEffect, useState } from 'react'
-import { veredicto, type Clase } from './veredicto'
+import { veredictoFinal, type Clase } from './veredicto'
 import { DEFECTOS, type CodigoDefecto } from './defectos'
 import type { CodigoAviso } from './calidad'
 import { wilson } from './validacion'
@@ -56,7 +56,7 @@ export function useLote() {
   const agregar = useCallback((p: number, vistas: number, miniatura: string, extra?: Extra) => {
     setLote((l) => {
       const n = l.length ? Math.max(...l.map((f) => f.n)) + 1 : 1
-      const v = veredicto(p)!
+      const v = veredictoFinal(p, extra?.defectos)!
       return [...l, { n, fecha: new Date().toISOString(), vistas, p, clase: v.clase, miniatura, defectos: extra?.defectos, avisos: extra?.avisos }]
     })
   }, [])
@@ -161,7 +161,7 @@ export function aCSV(lote: FrutoGuardado[], d: DatosLote): string {
       new Date(f.fecha).toLocaleString('es'),
       f.vistas,
       f.p.toFixed(4),
-      veredicto(f.p)!.corto,
+      veredictoFinal(f.p, f.defectos)!.corto,
       f.defectos?.length ? f.defectos.join('|') : 'ninguno',
       f.avisos?.length ? f.avisos.join('|') : 'ok',
       esDefectuoso(f, d) ? 1 : 0,

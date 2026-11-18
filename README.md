@@ -1,9 +1,10 @@
-# Arándano QC
+# BerryScan
 
 Aplicación web (PWA) que detecta **arándanos deshidratados** (con arrugamiento visible) a partir de una foto, usando un clasificador **YOLOv11n-cls** que corre directamente en el navegador del celular. Las fotos no se envían a ningún servidor.
 
-- **Evaluar**: basta una foto del fruto desde cualquier ángulo. La app revisa la calidad de la foto (varios objetos, forma, desenfoque, tamaño, exposición, fondo), la preprocesa igual que el dataset y la clasifica. Si el resultado es dudoso, sugiere agregar otra vista (hasta 3) y promedia las probabilidades.
-- **Otros defectos (experimental)**: además del modelo, revisa la forma y el color del fruto para marcar contornos irregulares (abolladuras, deformaciones) y zonas rojizas (heridas, pulpa expuesta, exudado). Calibrado con las 1573 fotos del dataset: 0,4 % de falsas alarmas en frutos sanos.
+- **Evaluar**: basta una foto del fruto desde cualquier ángulo. La app revisa la calidad de la foto (forma, desenfoque, tamaño, exposición, fondo), la preprocesa igual que el dataset y la clasifica. Si el resultado es dudoso, sugiere agregar otra vista del mismo fruto (hasta 3) y promedia las probabilidades; si las vistas no coinciden, avisa.
+- **Varios frutos por foto (opcional)**: si la foto tiene varios arándanos separados, la app los detecta (hasta 40), los numera en orden de lectura y evalúa cada uno por separado. Varios archivos subidos a la vez también se tratan como frutos distintos.
+- **Otros defectos (experimental)**: además del modelo, revisa la forma y el color del fruto para marcar contorno irregular (abolladuras, deformaciones), zonas rojizas (heridas, exudado), grietas o rajaduras y manchas café (daño, pudrición). Un fruto sin deshidratación pero con otro defecto queda como **Revisar**, no como Cumple. Calibrado con las 1573 fotos del dataset: menos del 1 % de falsas alarmas en frutos sanos.
 - **Lote**: guarda los frutos evaluados en el dispositivo junto con los datos del lote (código, productor, variedad, fecha, responsable). Emite un dictamen (aceptado, rechazado o muestra insuficiente) según una tolerancia de defectuosos configurable, con IC 95 %. Exporta a CSV y genera un informe imprimible o en PDF.
 - **Validación**: mide el desempeño del modelo con fotos de celular. Se marca la clase real de cada fruto antes de fotografiarlo y la app calcula exactitud (con IC 95 % de Wilson), sensibilidad, especificidad, precisión, F1 y matriz de confusión, por foto y por fruto. Exporta a CSV.
 - **Cómo funciona**: explica el proceso paso a paso, la regla de decisión, cómo tomar la foto, el modelo, sus resultados y sus limitaciones, con una demostración en vivo.
@@ -25,6 +26,8 @@ Aplicación web (PWA) que detecta **arándanos deshidratados** (con arrugamiento
 | < 35 % | Cumple |
 | 35 % – 65 % | Dudoso (revisar a mano) |
 | ≥ 65 % | No cumple |
+
+Si el fruto cumple pero la inspección complementaria encuentra otro defecto, el resultado pasa a **Revisar**.
 
 Los umbrales están en `src/lib/veredicto.ts`.
 
@@ -68,7 +71,7 @@ src/
   components/             Analizar (Evaluar), Lote, Validacion, ComoFunciona, Escala, Iconos
   lib/nucleo.js           preprocesamiento (igual que el dataset)
   lib/preproceso.worker.ts
-  lib/procesar.ts         decodifica la foto, localiza y recorta el fruto
+  lib/procesar.ts         decodifica la foto, localiza y recorta uno o varios frutos
   lib/modelo.ts           carga y ejecuta el modelo ONNX
   lib/veredicto.ts        umbrales y veredicto
   lib/lote.ts             lote guardado en el dispositivo y exportación CSV
