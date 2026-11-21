@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { aDataURL, analizarFoto, ErrorFoto, type Caja, type FotoProcesada } from '../lib/procesar'
 import { clasificar } from '../lib/modelo'
 import { evaluarCalidad, FotoNoValida, type Aviso } from '../lib/calidad'
@@ -6,8 +6,8 @@ import { DEFECTOS, inspeccionar, type CodigoDefecto } from '../lib/defectos'
 import type { Extra } from '../lib/lote'
 import { pct, promedio, UMBRAL_ALTO, UMBRAL_BAJO, veredictoFinal } from '../lib/veredicto'
 import { Escala } from './Escala'
-import { Alerta, Camara, Galeria, Mas } from './Iconos'
-import type { EstadoModelo } from '../App'
+import { Alerta, Camara, Encuadre, Galeria, Mas } from './Iconos'
+import type { AccionAviso, EstadoModelo } from '../App'
 
 const MAX_VISTAS = 3
 
@@ -42,7 +42,7 @@ interface Props {
   estadoModelo: EstadoModelo
   reintentarModelo: () => void
   onGuardar: (p: number, vistas: number, miniatura: string, extra: Extra) => void
-  avisar: (t: string) => void
+  avisar: (t: string, accion?: AccionAviso) => void
   irAGuia: () => void
 }
 
@@ -77,14 +77,17 @@ export function Analizar({ numero, estadoModelo, reintentarModelo, onGuardar, av
   const [verOriginal, setVerOriginal] = useState(false)
   const [procesando, setProcesando] = useState(false)
   const [error, setError] = useState('')
+  const [arrastrando, setArrastrando] = useState(false)
   const camara = useRef<HTMLInputElement>(null)
   const galeria = useRef<HTMLInputElement>(null)
+  const alPegarRef = useRef<(fs: File[]) => void>(() => {})
 
   const pm = promedio(vistas.map((v) => v.p))
   const defectos = [...new Set(vistas.flatMap((x) => x.defectos))]
   const v = veredictoFinal(pm, defectos)
   const actual = vistas[Math.min(sel, vistas.length - 1)]
   const lleno = vistas.length >= MAX_VISTAS
+  const bloqueado = procesando || estadoModelo === 'error'
   const conAvisos = vistas.filter((x) => x.avisos.length).length
   const ps = vistas.map((x) => x.p)
   const vistasDiscrepan = ps.length > 1 && Math.max(...ps) >= UMBRAL_ALTO && Math.min(...ps) <= UMBRAL_BAJO
@@ -156,6 +159,41 @@ export function Analizar({ numero, estadoModelo, reintentarModelo, onGuardar, av
     if (fs.length) analizar(fs)
   }
 
+  const imagenes = (l?: FileList | DataTransferItemList | null) =>
+    Array.from<File | DataTransferItem>(l ?? [])
+      .map((x) => (x instanceof File ? x : x.kind === 'file' ? x.getAsFile() : null))
+      .filter((f): f is File => !!f && f.type.startsWith('image/'))
+
+  function alSoltar(ev: React.DragEvent) {
+    ev.preventDefault()
+    setArrastrando(false)
+    if (bloqueado) return
+    const fs = imagenes(ev.dataTransfer.files)
+    if (fs.length) analizar(fs)
+    else setError('Suelta un archivo de imagen (JPG o PNG).')
+  }
+
+  // Pegar una imagen con Ctrl+V mientras esta sección está visible
+  useEffect(() => {
+    alPegarRef.current = (fs) => {
+      if (!bloqueado && fs.length) analizar(fs)
+    }
+  })
+  useEffect(() => {
+    const f = (ev: ClipboardEvent) => {
+      if (!camara.current?.offsetParent) return
+      const t = ev.target as HTMLElement | null
+      if (t?.closest('input, textarea, [contenteditable]')) return
+      const fs = imagenes(ev.clipboardData?.items)
+      if (fs.length) {
+        ev.preventDefault()
+        alPegarRef.current(fs)
+      }
+    }
+    window.addEventListener('paste', f)
+    return () => window.removeEventListener('paste', f)
+  }, [])
+
   async function probarEjemplo(nombre: 'sano' | 'deshidratado') {
     try {
       const r = await fetch(`${import.meta.env.BASE_URL}ejemplos/${nombre}.jpg`)
@@ -197,8 +235,6 @@ export function Analizar({ numero, estadoModelo, reintentarModelo, onGuardar, av
     avisar(`${validos.length} ${plural(validos.length, 'fruto guardado', 'frutos guardados')} en el lote`)
     reiniciar()
   }
-
-  const bloqueado = procesando || estadoModelo === 'error'
 
   const entradas = (
     <>
@@ -260,15 +296,28 @@ export function Analizar({ numero, estadoModelo, reintentarModelo, onGuardar, av
               procesando ? (
                 <div className="captura procesando"><span className="girando" /> Analizando la imagen…</div>
               ) : (
-                <div className="captura">
+                <div
+                  className={`captura${arrastrando ? ' arrastrando' : ''}`}
+                  onDragOver={(e) => {
+                    e.preventDefault()
+                    e.dataTransfer.dropEffect = 'copy'
+                    if (!arrastrando) setArrastrando(true)
+                  }}
+                  onDragLeave={(e) => {
+                    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setArrastrando(false)
+                  }}
+                  onDrop={alSoltar}
+                >
+                  <Encuadre className="captura-guia" size={72} />
                   <div>
-                    <h3>Sin imagen</h3>
+                    <h3>{arrastrando ? 'Suelta la imagen aquí' : 'Sin imagen'}</h3>
                     <p>Un fruto centrado, o varios separados entre sí, con luz pareja y sin flash.</p>
                   </div>
                   <div className="fila-btn">
                     <button className="btn" onClick={() => camara.current?.click()} disabled={bloqueado}><Camara size={18} /> Tomar foto</button>
                     <button className="btn sec" onClick={() => galeria.current?.click()} disabled={bloqueado}><Galeria size={18} /> Subir imágenes</button>
                   </div>
+                  <p className="captura-pista">También puedes arrastrar imágenes aquí o pegarlas con <kbd>Ctrl</kbd>&nbsp;+&nbsp;<kbd>V</kbd>.</p>
                 </div>
               )
             ) : (
@@ -280,7 +329,7 @@ export function Analizar({ numero, estadoModelo, reintentarModelo, onGuardar, av
                 <div className="tira">
                   {vistas.map((vi, i) => (
                     <button key={i} className="miniatura" aria-pressed={i === sel} onClick={() => setSel(i)} aria-label={`Vista ${i + 1}`}>
-                      <img src={vi.entrada} alt="" />
+                      <img src={vi.entrada} alt="" width={64} height={64} />
                       {vi.avisos.length > 0 && <span className="marca-aviso" title="Foto con advertencias de calidad">!</span>}
                       <span className="p">{pct(vi.p)}</span>
                     </button>
@@ -436,7 +485,7 @@ export function Analizar({ numero, estadoModelo, reintentarModelo, onGuardar, av
               </div>
 
               <div className="detalle-fruto">
-                {fr.entrada ? <img src={fr.entrada} alt={`Fruto ${iSel + 1} procesado`} /> : <span className="sin-img" />}
+                {fr.entrada ? <img src={fr.entrada} alt={`Fruto ${iSel + 1} procesado`} width={72} height={72} /> : <span className="sin-img" />}
                 <div>
                   <b>Fruto {iSel + 1}</b>
                   {vSel ? (
@@ -469,7 +518,7 @@ export function Analizar({ numero, estadoModelo, reintentarModelo, onGuardar, av
                 {g.frutos.map((f, i) => (
                   <button key={i} className="fila-grupo" aria-pressed={i === iSel} onClick={() => setSelG(i)}>
                     <span className="mono n">{i + 1}</span>
-                    {f.entrada ? <img src={f.entrada} alt="" /> : <span className="sin-img" />}
+                    {f.entrada ? <img src={f.entrada} alt="" width={40} height={40} loading="lazy" /> : <span className="sin-img" />}
                     <span className="mono p">{f.p != null ? pct(f.p) : '—'}</span>
                     <span className="res">
                       {vs[i] ? <span className={`calidad ${vs[i]!.clase}`}>{vs[i]!.corto}</span> : <span className="small muted">No analizado</span>}

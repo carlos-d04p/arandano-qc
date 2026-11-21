@@ -3,14 +3,16 @@ import { aCSV, descargar, dictamen, esDefectuoso, nombresDefectos, resumen, type
 import { fmt } from '../lib/validacion'
 import { pct, veredictoFinal } from '../lib/veredicto'
 import { Basura, Copiar, Descargar, Imprimir, Logo } from './Iconos'
+import type { AccionAviso } from '../App'
 
 interface Props {
   lote: FrutoGuardado[]
   datos: DatosLote
   cambiar: <K extends keyof DatosLote>(k: K, v: DatosLote[K]) => void
   quitar: (n: number) => void
+  restaurar: (f: FrutoGuardado) => void
   nuevoLote: () => void
-  avisar: (t: string) => void
+  avisar: (t: string, accion?: AccionAviso) => void
   irAAnalizar: () => void
 }
 
@@ -37,7 +39,12 @@ function textoDictamen(dc: Dictamen, d: DatosLote, total: number): string {
 
 const fechaLarga = (s: string) => (s ? new Date(s + 'T12:00:00').toLocaleDateString('es', { day: '2-digit', month: 'long', year: 'numeric' }) : '—')
 
-export function Lote({ lote, datos, cambiar, quitar, nuevoLote, avisar, irAAnalizar }: Props) {
+export function Lote({ lote, datos, cambiar, quitar, restaurar, nuevoLote, avisar, irAAnalizar }: Props) {
+  const eliminar = (f: FrutoGuardado) => {
+    quitar(f.n)
+    avisar(`Muestra ${f.n} eliminada`, { etiqueta: 'Deshacer', fn: () => restaurar(f) })
+  }
+
   const r = resumen(lote)
   const dc = dictamen(lote, datos)
   const ancho = (n: number) => `${r.total ? (100 * n) / r.total : 0}%`
@@ -73,7 +80,11 @@ export function Lote({ lote, datos, cambiar, quitar, nuevoLote, avisar, irAAnali
   const campo = (k: 'codigo' | 'productor' | 'variedad' | 'responsable' | 'notas', etq: string, ph: string) => (
     <label className="campo-form">
       <span>{etq}</span>
-      <input className="entrada" value={datos[k]} placeholder={ph} onChange={(e) => cambiar(k, e.target.value)} />
+      <input
+        className="entrada" name={k} value={datos[k]} placeholder={ph} autoComplete="off" maxLength={k === 'notas' ? 300 : 80}
+        spellCheck={k === 'notas'} translate={k === 'codigo' ? 'no' : undefined}
+        onChange={(e) => cambiar(k, e.target.value)}
+      />
     </label>
   )
 
@@ -126,15 +137,15 @@ export function Lote({ lote, datos, cambiar, quitar, nuevoLote, avisar, irAAnali
           <div className="panel">
             <div className="panel-cab"><h2>Datos del lote</h2></div>
             <div className="panel-cuerpo form-lote">
-              {campo('codigo', 'Código de lote', 'Ej. L-2026-118')}
-              {campo('productor', 'Productor o proveedor', 'Nombre o código')}
-              {campo('variedad', 'Variedad', 'Ej. Biloxi')}
+              {campo('codigo', 'Código de lote', 'Ej.: L-2026-118…')}
+              {campo('productor', 'Productor o proveedor', 'Nombre o código…')}
+              {campo('variedad', 'Variedad', 'Ej.: Biloxi…')}
               <label className="campo-form">
                 <span>Fecha de muestreo</span>
-                <input className="entrada" type="date" value={datos.fecha} onChange={(e) => cambiar('fecha', e.target.value)} />
+                <input className="entrada" type="date" name="fecha" autoComplete="off" value={datos.fecha} onChange={(e) => cambiar('fecha', e.target.value)} />
               </label>
-              {campo('responsable', 'Responsable', 'Nombre del inspector')}
-              {campo('notas', 'Observaciones', 'Opcional')}
+              {campo('responsable', 'Responsable', 'Nombre de quien inspecciona…')}
+              {campo('notas', 'Observaciones', 'Opcional…')}
             </div>
           </div>
 
@@ -143,17 +154,17 @@ export function Lote({ lote, datos, cambiar, quitar, nuevoLote, avisar, irAAnali
             <div className="panel-cuerpo form-lote">
               <label className="campo-form">
                 <span>Tolerancia máxima de defectuosos (%)</span>
-                <input className="entrada" type="number" inputMode="decimal" min={0} max={100} step={0.5} value={datos.tolerancia}
+                <input className="entrada" type="number" name="tolerancia" autoComplete="off" inputMode="decimal" min={0} max={100} step={0.5} value={datos.tolerancia}
                   onChange={(e) => cambiar('tolerancia', Math.min(100, Math.max(0, Number(e.target.value) || 0)))} />
               </label>
               <label className="campo-form">
                 <span>Tamaño mínimo de muestra (frutos)</span>
-                <input className="entrada" type="number" inputMode="numeric" min={1} max={1000} step={1} value={datos.minimo}
+                <input className="entrada" type="number" name="minimo" autoComplete="off" inputMode="numeric" min={1} max={1000} step={1} value={datos.minimo}
                   onChange={(e) => cambiar('minimo', Math.min(1000, Math.max(1, Math.round(Number(e.target.value) || 1))))} />
               </label>
               <label className="campo-form ancho">
                 <span>Resultados dudosos o a revisar</span>
-                <select className="entrada" value={datos.dudosos} onChange={(e) => cambiar('dudosos', e.target.value as DatosLote['dudosos'])}>
+                <select className="entrada" name="dudosos" value={datos.dudosos} onChange={(e) => cambiar('dudosos', e.target.value as DatosLote['dudosos'])}>
                   <option value="defectuoso">Cuentan como defectuosos (criterio conservador)</option>
                   <option value="excluir">Se excluyen del cálculo</option>
                 </select>
@@ -194,7 +205,7 @@ export function Lote({ lote, datos, cambiar, quitar, nuevoLote, avisar, irAAnali
                   const v = veredictoFinal(f.p, f.defectos)!
                   return (
                     <tr key={f.n}>
-                      <td><img src={f.miniatura} alt="" /></td>
+                      <td><img src={f.miniatura} alt="" width={40} height={40} loading="lazy" /></td>
                       <td className="mono">{id(f.n)}</td>
                       <td className="col-hora mono muted">{hora(f.fecha)}</td>
                       <td className="col-vistas r mono">{f.vistas}</td>
@@ -204,7 +215,7 @@ export function Lote({ lote, datos, cambiar, quitar, nuevoLote, avisar, irAAnali
                         {f.defectos && f.defectos.length > 0 && <span className="defecto-mini" title={nombresDefectos(f.defectos)}>otros defectos</span>}
                         {f.avisos && f.avisos.length > 0 && <span className="aviso-mini" title="Foto con advertencias de calidad">foto</span>}
                       </td>
-                      <td><button className="icon-btn" onClick={() => quitar(f.n)} aria-label={`Eliminar muestra ${f.n}`}><Basura size={16} /></button></td>
+                      <td><button className="icon-btn" onClick={() => eliminar(f)} aria-label={`Eliminar muestra ${f.n}`}><Basura size={16} /></button></td>
                     </tr>
                   )
                 })}

@@ -9,7 +9,7 @@ import {
   type Caso, type ClaseReal, type Metricas, type Registro,
 } from '../lib/validacion'
 import { Alerta, Basura, Camara, Copiar, Descargar, Galeria } from './Iconos'
-import type { EstadoModelo } from '../App'
+import type { AccionAviso, EstadoModelo } from '../App'
 
 const MAX_VISTAS = 3
 const NOMBRE: Record<ClaseReal, string> = { sano: 'Sano', deshidratado: 'Deshidratado' }
@@ -20,7 +20,7 @@ const ETIQUETA_AVISO: Record<CodigoAviso, string> = {
 
 interface Props {
   estadoModelo: EstadoModelo
-  avisar: (t: string) => void
+  avisar: (t: string, accion?: AccionAviso) => void
 }
 
 /** Distribución de P(deshidratado) por clase real: sirve para revisar si los umbrales siguen siendo adecuados. */
@@ -179,9 +179,13 @@ export function Validacion({ estadoModelo, avisar }: Props) {
   }
 
   function deshacer() {
+    const quitados = val.registros.filter((r) => ultimos.some((u) => u.id === r.id))
     for (const u of ultimos) val.quitar(u.id)
     setUltimos([])
-    avisar(ultimos.length > 1 ? `${ultimos.length} registros eliminados` : 'Registro eliminado')
+    avisar(quitados.length > 1 ? `${quitados.length} registros eliminados` : 'Registro eliminado', {
+      etiqueta: 'Deshacer',
+      fn: () => quitados.forEach(val.restaurar),
+    })
   }
 
   async function copiar() {
@@ -263,7 +267,7 @@ export function Validacion({ estadoModelo, avisar }: Props) {
               ) : (
                 <>
                   <div className="resultado-val">
-                    <img src={ultimo.entrada} alt="Imagen analizada" />
+                    <img src={ultimo.entrada} alt="Imagen analizada" width={112} height={112} />
                     <dl className="datos" style={{ marginTop: 0 }}>
                       <dt>Fruto</dt><dd className="mono">{idFruto(ultimo.fruto)} · V{ultimo.vista}</dd>
                       <dt>Clase real</dt><dd>{NOMBRE[ultimo.real]}</dd>
@@ -299,8 +303,8 @@ export function Validacion({ estadoModelo, avisar }: Props) {
             <div className="panel-cuerpo">
               <label className="campo-etq" htmlFor="condiciones">Dispositivo, iluminación y fondo (se incluye en el CSV)</label>
               <input
-                id="condiciones" className="entrada" type="text" value={val.condiciones} maxLength={160}
-                placeholder="Ej.: Samsung A54, luz de ventana, cartulina gris"
+                id="condiciones" name="condiciones" className="entrada" type="text" value={val.condiciones} maxLength={160} autoComplete="off"
+                placeholder="Ej.: Samsung A54, luz de ventana, cartulina gris…"
                 onChange={(e) => val.setCondiciones(e.target.value)}
               />
             </div>
@@ -362,7 +366,7 @@ export function Validacion({ estadoModelo, avisar }: Props) {
                       const ok = (r.p >= 0.5 ? 'deshidratado' : 'sano') === r.real
                       return (
                         <tr key={r.id}>
-                          <td><img src={r.miniatura} alt="" /></td>
+                          <td><img src={r.miniatura} alt="" width={40} height={40} loading="lazy" /></td>
                           <td className="mono">{idFruto(r.fruto)}<span className="muted">·V{r.vista}</span></td>
                           <td>{NOMBRE[r.real]}</td>
                           <td className="r mono">{pct(r.p)}</td>
@@ -370,7 +374,7 @@ export function Validacion({ estadoModelo, avisar }: Props) {
                             {ok ? <span className="calidad ok">Acierto</span> : <span className="calidad mal">Error</span>}
                             {r.avisos && r.avisos.length > 0 && <span className="aviso-mini" title={r.avisos.map((a) => ETIQUETA_AVISO[a]).join(', ')}>calidad</span>}
                           </td>
-                          <td><button className="icon-btn" onClick={() => val.quitar(r.id)} aria-label={`Eliminar registro de ${idFruto(r.fruto)}`}><Basura size={16} /></button></td>
+                          <td><button className="icon-btn" onClick={() => { val.quitar(r.id); avisar(`Registro de ${idFruto(r.fruto)} eliminado`, { etiqueta: 'Deshacer', fn: () => val.restaurar(r) }) }} aria-label={`Eliminar registro de ${idFruto(r.fruto)}`}><Basura size={16} /></button></td>
                         </tr>
                       )
                     })}

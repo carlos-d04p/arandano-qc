@@ -67,8 +67,8 @@ function DemoEnVivo({ estadoModelo }: { estadoModelo: EstadoModelo }) {
               const v = veredicto(d.p)!
               return (
                 <tr key={d.nombre}>
-                  <td><img src={d.original} alt={`Fruto ${d.nombre}, foto original`} /></td>
-                  <td><img src={d.entrada} alt="Imagen preprocesada" /></td>
+                  <td><img src={d.original} alt={`Fruto ${d.nombre}, foto original`} width={132} height={132} loading="lazy" /></td>
+                  <td><img src={d.entrada} alt="Imagen preprocesada" width={132} height={132} loading="lazy" /></td>
                   <td>
                     <span className={`calidad ${v.clase}`}>{v.corto}</span>
                     <div className="mono small muted" style={{ marginTop: 2 }}>P = {pct(d.p)}</div>

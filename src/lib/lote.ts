@@ -62,9 +62,11 @@ export function useLote() {
   }, [])
 
   const quitar = useCallback((n: number) => setLote((l) => l.filter((f) => f.n !== n)), [])
+  /** Vuelve a insertar una muestra eliminada (deshacer) */
+  const restaurar = useCallback((f: FrutoGuardado) => setLote((l) => (l.some((x) => x.n === f.n) ? l : [...l, f].sort((a, b) => a.n - b.n))), [])
   const vaciar = useCallback(() => setLote([]), [])
 
-  return { lote, siguiente, agregar, quitar, vaciar }
+  return { lote, siguiente, agregar, quitar, restaurar, vaciar }
 }
 
 // ---------- Datos del lote y criterio de aceptación ----------

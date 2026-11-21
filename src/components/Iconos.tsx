@@ -20,6 +20,14 @@ export const Galeria = (p: P) => (
 export const Escanear = (p: P) => (
   <Base {...p}><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2" /><circle cx="12" cy="12" r="4" /></Base>
 )
+/** Guía de encuadre: esquinas de visor con un fruto centrado */
+export const Encuadre = (p: P) => (
+  <Base strokeWidth={1.2} {...p}>
+    <path d="M3 7.5V5a2 2 0 0 1 2-2h2.5M16.5 3H19a2 2 0 0 1 2 2v2.5M21 16.5V19a2 2 0 0 1-2 2h-2.5M7.5 21H5a2 2 0 0 1-2-2v-2.5" />
+    <circle cx="12" cy="12.4" r="4.2" />
+    <path d="M10.6 8.5 12 9.6l1.4-1.1" />
+  </Base>
+)
 export const Lista = (p: P) => (
   <Base {...p}><path d="M9 6h11M9 12h11M9 18h11" /><circle cx="4.5" cy="6" r="1" /><circle cx="4.5" cy="12" r="1" /><circle cx="4.5" cy="18" r="1" /></Base>
 )

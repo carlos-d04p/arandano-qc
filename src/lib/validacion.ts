@@ -55,13 +55,18 @@ export function useValidacion() {
   }, [])
 
   const quitar = useCallback((id: number) => setEstado((e) => ({ ...e, registros: e.registros.filter((r) => r.id !== id) })), [])
+  /** Vuelve a insertar un registro eliminado (deshacer) */
+  const restaurar = useCallback(
+    (r: Registro) => setEstado((e) => (e.registros.some((x) => x.id === r.id) ? e : { ...e, registros: [...e.registros, r].sort((a, b) => a.id - b.id) })),
+    [],
+  )
   const sumarRechazo = useCallback(() => setEstado((e) => ({ ...e, rechazadas: e.rechazadas + 1 })), [])
   const setCondiciones = useCallback((condiciones: string) => setEstado((e) => ({ ...e, condiciones })), [])
   const vaciar = useCallback(() => setEstado((e) => ({ ...VACIO, condiciones: e.condiciones })), [])
 
   const siguienteFruto = estado.registros.length ? Math.max(...estado.registros.map((r) => r.fruto)) + 1 : 1
 
-  return { ...estado, siguienteFruto, agregar, quitar, sumarRechazo, setCondiciones, vaciar }
+  return { ...estado, siguienteFruto, agregar, quitar, restaurar, sumarRechazo, setCondiciones, vaciar }
 }
 
 export interface Caso {

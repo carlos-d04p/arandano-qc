@@ -8,6 +8,10 @@ import { cargarModelo } from './lib/modelo'
 import { useDatosLote, useLote } from './lib/lote'
 
 export type EstadoModelo = 'cargando' | 'listo' | 'error'
+export interface AccionAviso {
+  etiqueta: string
+  fn: () => void
+}
 type Pestana = 'analizar' | 'lote' | 'validacion' | 'guia'
 
 const PESTANAS: { id: Pestana; titulo: string; Icono: typeof Escanear }[] = [
@@ -25,9 +29,9 @@ function pestanaInicial(): Pestana {
 export default function App() {
   const [pestana, setPestana] = useState<Pestana>(pestanaInicial)
   const [estadoModelo, setEstadoModelo] = useState<EstadoModelo>('cargando')
-  const [toast, setToast] = useState('')
+  const [toast, setToast] = useState<{ texto: string; accion?: AccionAviso } | null>(null)
   const timer = useRef<number>(undefined)
-  const { lote, siguiente, agregar, quitar, vaciar } = useLote()
+  const { lote, siguiente, agregar, quitar, restaurar, vaciar } = useLote()
   const { datos, cambiar, nuevoLote } = useDatosLote()
 
   const esperarModelo = useCallback(() => {
@@ -56,7 +60,11 @@ export default function App() {
     return () => window.removeEventListener('hashchange', f)
   }, [])
 
-  const ir = (p: Pestana) => {
+  const href = (p: Pestana) => (p === 'analizar' ? '#' : `#${p}`)
+  const ir = (p: Pestana, e?: React.MouseEvent) => {
+    // los clics con Ctrl/Cmd o la rueda abren la sección en otra pestaña del navegador
+    if (e && (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0)) return
+    e?.preventDefault()
     if (p !== pestana) {
       history.replaceState(null, '', p === 'analizar' ? location.pathname : `#${p}`)
       setPestana(p)
@@ -64,28 +72,38 @@ export default function App() {
     }
   }
 
-  const avisar = useCallback((t: string) => {
-    setToast(t)
+  const avisar = useCallback((texto: string, accion?: AccionAviso) => {
+    setToast({ texto, accion })
     window.clearTimeout(timer.current)
-    timer.current = window.setTimeout(() => setToast(''), 2400)
+    timer.current = window.setTimeout(() => setToast(null), accion ? 6000 : 2600)
   }, [])
 
-  const etiquetaModelo = { cargando: 'Cargando modelo', listo: 'Modelo listo', error: 'Error de modelo · reintentar' }[estadoModelo]
+  const etiquetaModelo = { cargando: 'Cargando modelo…', listo: 'Modelo listo', error: 'Error de modelo · reintentar' }[estadoModelo]
 
   return (
     <div className="app">
+      <a
+        className="saltar"
+        href="#contenido"
+        onClick={(e) => {
+          e.preventDefault()
+          document.getElementById('contenido')?.focus()
+        }}
+      >
+        Saltar al contenido
+      </a>
       <header className="topbar">
         <div className="topbar-in">
-          <div className="marca">
+          <a className="marca" href="#" onClick={(e) => ir('analizar', e)} aria-label="BerryScan, ir a Evaluar">
             <Logo />
-            <span className="marca-nombre">BerryScan</span>
-          </div>
+            <span className="marca-nombre" translate="no">BerryScan</span>
+          </a>
           <nav className="tabs-top" aria-label="Secciones">
             {PESTANAS.map(({ id, titulo }) => (
-              <button key={id} onClick={() => ir(id)} aria-current={pestana === id ? 'page' : undefined}>
+              <a key={id} href={href(id)} onClick={(e) => ir(id, e)} aria-current={pestana === id ? 'page' : undefined}>
                 {titulo}
-                {id === 'lote' && lote.length > 0 && <span className="contador">{lote.length}</span>}
-              </button>
+                {id === 'lote' && lote.length > 0 && <span className="contador" aria-label={`${lote.length} muestras`}>{lote.length}</span>}
+              </a>
             ))}
           </nav>
           <div className="espacio" />
@@ -94,6 +112,7 @@ export default function App() {
             onClick={estadoModelo === 'error' ? iniciarModelo : undefined}
             disabled={estadoModelo !== 'error'}
             title="YOLOv11n-cls · ONNX Runtime Web"
+            aria-live="polite"
           >
             <span className="punto" />
             {etiquetaModelo}
@@ -101,7 +120,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="contenido">
+      <main className="contenido" id="contenido" tabIndex={-1}>
         {/* Evaluar queda montado para no perder las vistas al cambiar de sección */}
         <div hidden={pestana !== 'analizar'}>
           <Analizar
@@ -119,6 +138,7 @@ export default function App() {
             datos={datos}
             cambiar={cambiar}
             quitar={quitar}
+            restaurar={restaurar}
             nuevoLote={() => {
               vaciar()
               nuevoLote()
@@ -136,16 +156,32 @@ export default function App() {
 
       <nav className="nav-bottom" aria-label="Secciones">
         {PESTANAS.map(({ id, titulo, Icono }) => (
-          <button key={id} onClick={() => ir(id)} aria-current={pestana === id ? 'page' : undefined}>
+          <a key={id} href={href(id)} onClick={(e) => ir(id, e)} aria-current={pestana === id ? 'page' : undefined}>
             <span className="icono-wrap">
               <Icono size={21} />
-              {id === 'lote' && lote.length > 0 && <span className="contador-badge">{lote.length}</span>}
+              {id === 'lote' && lote.length > 0 && <span className="contador-badge" aria-label={`${lote.length} muestras`}>{lote.length}</span>}
             </span>
             {titulo}
-          </button>
+          </a>
         ))}
       </nav>
-      {toast && <div className="toast" role="status">{toast}</div>}
+      <div className="toast-zona" role="status" aria-live="polite">
+        {toast && (
+          <div className="toast">
+            <span>{toast.texto}</span>
+            {toast.accion && (
+              <button
+                onClick={() => {
+                  toast.accion!.fn()
+                  setToast(null)
+                }}
+              >
+                {toast.accion.etiqueta}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
